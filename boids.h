@@ -4,13 +4,15 @@
 #include <vector>
 
 struct Boid {
-    unsigned int id ;
     V3 pos ;
     V3 vel ;
     V3 acc ;
 } ;
-void seperate(const double s, const Boid* b, const std::vector<Boid> bs, V3* sep) ;
-void cohesion(const double x, const Boid* b, const std::vector<Boid> bs, V3* coh) ;
-void align(const double x, const std::vector<Boid> bs, V3* ali) ;
+void update_flock(std::vector<Boid> bs) ;
+void update_boid(Boid* b, std::vector<Boid> bs) ;
+void seperate(float s, const Boid* b, const std::vector<Boid> bs, V3* sep) ;
+void cohesion(float x, const Boid* b, const std::vector<Boid> bs, V3* coh) ;
+void align(float x, const std::vector<Boid> bs, V3* ali) ;
 V3 centroid(std::vector<Boid> bs) ;
+
 #endif
