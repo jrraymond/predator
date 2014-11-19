@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 #include <thread>
 #include "boids.h"
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -30,7 +31,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE) ;
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE) ;
 
-    GLFWwindow* window = glfwCreateWindow(600, 600, "OpenGL", NULL, NULL) ;
+    GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", NULL, NULL) ;
     glfwMakeContextCurrent(window) ;
 
     glewExperimental = GL_TRUE ;
@@ -50,10 +51,14 @@ int main() {
     glGenBuffers(1, &vbo) ;
     glBindBuffer(GL_ARRAY_BUFFER, vbo) ;
     float vertices[] = {
-            0.5f, 0.5f, 1.0f, 1.0f, 1.0f, //top-right
-            -0.5f,  0.5f, 1.0f, 0.0f, 0.0f, //top-left
-            0.5f, -0.5f, 0.0f, 1.0f, 0.0f, //bottom-right
-            -0.5f, -0.5f, 0.0f, 0.0f, 1.0f //bottom-left
+             1.0f,  1.0f,  1.0f, 0.0f, 0.0f, 1.0f, //near-right-top-0
+             1.0f,  1.0f, -1.0f, 0.0f, 1.0f, 0.0f, //near-right-bot-1
+             1.0f, -1.0f, -1.0f, 1.0f, 0.0f, 0.0f, //near-left-bot-2
+             1.0f, -1.0f,  1.0f, 1.0f, 1.0f, 0.0f, //near-left-top-3
+            -1.0f,  1.0f,  1.0f, 0.0f, 1.0f, 1.0f, //far-right-top-4
+            -1.0f, -1.0f,  1.0f, 0.1f, 0.1f, 0.1f, //far-left-top-5
+            -1.0f,  1.0f, -1.0f, 0.0f, 0.5f, 0.5f, //far-right-bot-6
+            -1.0f, -1.0f, -1.0f, 0.5f, 0.5f, 0.0f, //far-left-bot-7
     } ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW) ;
 
@@ -62,20 +67,32 @@ int main() {
     glGenBuffers(1, &ebo) ;
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo) ;
     GLuint elements[] = {
-            0, 1, 2,
-            1, 3, 2
+            0, 3, 1, //front-ur,ll
+            1, 3, 2,
+            0, 4, 3, //top-nr,fl
+            5, 3, 4,
+            4, 6, 5, //far-ur,ll
+            5, 6, 7,
+            1, 2, 6, //bottom-nr, fl
+            2, 7, 6,
+            3, 5, 7, //left-fu,nl
+            2, 3, 7,
+            0, 1, 4, //right-nu,fl
+            1, 6, 4
     } ;
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW) ;
 
     // Create and compile the vertex shader
     const char* vertex_src = GLSL(
-        in vec2 position ;
+        uniform mat4 model ;
+        uniform mat4 proj ;
+        uniform mat4 view ;
+        in vec3 position ;
         in vec3 color ;
         out vec3 Color ;
-        uniform mat4 trans ;
         void main() {
             Color = color ;
-            gl_Position = trans * vec4(position, 0.0, 1.0) ;
+            gl_Position = proj * view * model * vec4(position, 1.0) ;
         }
     ) ;
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER) ;
@@ -84,12 +101,11 @@ int main() {
 
     // Create and compile the fragment shader
     const char* fragment_src = GLSL(
-        uniform vec3 vertex_color ;
         in vec3 Color ;
         out vec4 out_color ;
 
         void main() {
-            out_color = vec4(vertex_color, 1.0f) ;
+            out_color = vec4(Color, 1.0f) ;
         }
     ) ;
     GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER) ;
@@ -108,37 +124,48 @@ int main() {
     // Specify the layout of the vertex data
     GLint pos_attr = glGetAttribLocation(shader_prog, "position") ;
     glEnableVertexAttribArray(pos_attr) ;
-    glVertexAttribPointer(pos_attr, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), 0) ;
+    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), 0) ;
     GLint col_attr = glGetAttribLocation(shader_prog, "color") ;
     glEnableVertexAttribArray(col_attr) ;
-    glVertexAttribPointer(col_attr, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat))) ;
+    glVertexAttribPointer(col_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))) ;
 
 
-    GLint uni_trans = glGetUniformLocation(shader_prog, "trans") ;
+    GLint uni_model = glGetUniformLocation(shader_prog, "model") ;
+    glm::mat4 view = glm::lookAt(
+            glm::vec3(1.5f, 1.5f, 1.5f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 1.0f)
+    );
+    GLint uni_view = glGetUniformLocation(shader_prog, "view") ;
+    glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view));
+    glm::mat4 proj = glm::perspective(45.0f, 800.0f / 600.0f, 1.0f, 10.0f);
+    GLint uni_proj = glGetUniformLocation(shader_prog, "proj") ;
+    glUniformMatrix4fv(uni_proj, 1, GL_FALSE, glm::value_ptr(proj));
+
+    //depth
+    glEnable(GL_DEPTH_TEST) ;
 
 
     // ---------------------------- RENDERING ------------------------------ //
     while(!glfwWindowShouldClose(window))
     {
-        GLint uni_color = glGetUniformLocation(shader_prog, "vertex_color") ;
-        float time = (float) glfwGetTime() ;
-        float adj_factor = sin(time) - 0.5f ;
-        glUniform3f(uni_color, adj_factor, adj_factor, adj_factor) ;
+        //GLint uni_color = glGetUniformLocation(shader_prog, "vertex_color") ;
+        //float time = (float) glfwGetTime() ;
+        //float adj_factor = sin(time) - 0.5f ;
+        //glUniform3f(uni_color, adj_factor, adj_factor, adj_factor) ;
 
-        glm::mat4 trans; //simple 2d rotation
-        trans = glm::rotate(trans, (float)clock()/(float) CLOCKS_PER_SEC*180.0f, glm::vec3(0.0f, 0.0f, 1.0f));
-        glUniformMatrix4fv(uni_trans, 1, GL_FALSE, glm::value_ptr(trans));
+        glm::mat4 model ; //simple 2d rotation
+        //model = glm::rotate(model, (float) 0, glm::vec3(0.0f, 0.0f, 1.0f));
+        model = glm::rotate(model, (float)sin(glfwGetTime())*2.0f, glm::vec3(0.0f, 0.5f, 0.5f));
+        glUniformMatrix4fv(uni_model, 1, GL_FALSE, glm::value_ptr(model));
 
-        // Clear the screen to black
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f) ;
-        glClear(GL_COLOR_BUFFER_BIT) ;
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f) ; // Clear the screen to black
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) ;
 
-        // Draw a triangle from the 3 vertices glDrawArrays(GL_TRIANGLES, 0, 3) ;
-        // Draw using element buffer
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0) ;
+        //glDrawArrays(GL_TRIANGLES, 0, 36) ; // Draw a triangle from the 3 vertices glDrawArrays(GL_TRIANGLES, 0, 3) ;
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
 
-        // Swap buffers and poll window events
-        glfwSwapBuffers(window) ;
+        glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
     }
     // ---------------------------- CLEARING ------------------------------ //
