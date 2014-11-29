@@ -5,10 +5,15 @@ project(flock_herd_school)
 SET(${PROJECT_NAME}_MAJOR_VERSION 0)
 SET(${PROJECT_NAME}_MINOR_VERSION 1)
 
-find_package(OpenGL REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_search_module(GLFW REQUIRED glfw3)
+include_directories(${GLFW_INCLUDE_DIRS})
 
-find_package(glfw REQUIRED)
-include_directories(${GLFW_INCLUDE_DIR})
+#find_package(glfw REQUIRED)
+#include_directories(${GLFW_INCLUDE_DIRS})
+
+find_package(OpenGL REQUIRED)
+include_directories(${OPENGL_INCLUDE_DIRS})
 
 find_package(GLEW REQUIRED)
 include_directories(${GLEW_INCLUDE_DIR})
@@ -20,6 +25,8 @@ set(SOURCE_FILES main.cpp boids.cpp vector3.cpp)
 
 add_executable(flock_herd_school ${SOURCE_FILES})
 
-TARGET_LINK_LIBRARIES(flock_herd_school glfw3 ${GLFW_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARY})
+#target_link_libraries(flock_herd_school ${GLFW_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})
+target_link_libraries(flock_herd_school  ${GLFW_LIBRARIES} X11 Xxf86vm Xrandr pthread Xi ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})
+
 
 
