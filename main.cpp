@@ -13,9 +13,19 @@
 
 #define GLSL(src) "#version 150 core\n" #src
 
+struct Player {
+    glm::vec3 pos;
+    glm::vec3 vel;
+    glm::vec3 acc;
+    float h_angle;
+    float v_angle;
+    float fov;
+};
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
 void render(std::vector<Boid>) ;
 void draw_boid(Boid*) ;
+void handle_input(GLFWwindow* window, Player* p, glm::mat4* view, float dt);
+
 
 
 int main() {
@@ -39,6 +49,10 @@ int main() {
         fprintf(stderr, "Failed to initialize GLEW\n") ;
         return -1 ;
     }
+    Player player1 = Player {glm::vec3(10.0f, 10.0f, 10.0f)
+                            ,glm::vec3(0.0f, 0.0f, 0.0f)
+                            ,glm::vec3(0.0f, 0.0f, 0.0f)
+                            ,0.0f,0.0f,45.0f};
     // ----------------------------- RESOURCES ----------------------------- //
 
     // Create Vertex Array Object
@@ -61,7 +75,6 @@ int main() {
             -1.0f, -1.0f, -1.0f, 0.5f, 0.5f, 0.0f, //far-left-bot-7
     } ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW) ;
-
     // Create an element array
     GLuint ebo ;
     glGenBuffers(1, &ebo) ;
@@ -81,7 +94,6 @@ int main() {
             1, 6, 4
     } ;
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW) ;
-
     // Create and compile the vertex shader
     const char* vertex_src = GLSL(
         uniform mat4 model ;
@@ -138,25 +150,33 @@ int main() {
     );
     GLint uni_view = glGetUniformLocation(shader_prog, "view") ;
     glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view));
-    glm::mat4 proj = glm::perspective(45.0f, 800.0f / 600.0f, 1.0f, 10.0f);
+    glm::mat4 proj = glm::perspective(45.0f, 800.0f / 600.0f, 1.0f, 100.0f);
     GLint uni_proj = glGetUniformLocation(shader_prog, "proj") ;
     glUniformMatrix4fv(uni_proj, 1, GL_FALSE, glm::value_ptr(proj));
 
     //depth
     glEnable(GL_DEPTH_TEST) ;
 
-
+    // ------------------------ Handling Input ----------------------------- //
+    float lastTime = glfwGetTime() ;
+    float thisTime, deltaTime ;
     // ---------------------------- RENDERING ------------------------------ //
     while(!glfwWindowShouldClose(window))
     {
+        lastTime = thisTime ;
+        thisTime = glfwGetTime() ;
+        deltaTime = thisTime - lastTime ;
         //GLint uni_color = glGetUniformLocation(shader_prog, "vertex_color") ;
         //float time = (float) glfwGetTime() ;
         //float adj_factor = sin(time) - 0.5f ;
         //glUniform3f(uni_color, adj_factor, adj_factor, adj_factor) ;
 
+        handle_input(window, &player1, &view, deltaTime) ;
+        glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view));
+
         glm::mat4 model ; //simple 2d rotation
-        //model = glm::rotate(model, (float) 0, glm::vec3(0.0f, 0.0f, 1.0f));
-        model = glm::rotate(model, (float)sin(glfwGetTime())*2.0f, glm::vec3(0.0f, 0.5f, 0.5f));
+        model = glm::rotate(model, 0.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+        //model = glm::rotate(model, (float)sin(glfwGetTime())*2.0f, glm::vec3(0.0f, 0.5f, 0.5f));
         glUniformMatrix4fv(uni_model, 1, GL_FALSE, glm::value_ptr(model));
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f) ; // Clear the screen to black
@@ -164,7 +184,6 @@ int main() {
 
         //glDrawArrays(GL_TRIANGLES, 0, 36) ; // Draw a triangle from the 3 vertices glDrawArrays(GL_TRIANGLES, 0, 3) ;
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
-
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
     }
@@ -179,6 +198,22 @@ int main() {
     glfwTerminate() ;
 
     return EXIT_SUCCESS ;
+}
+
+void handle_input(GLFWwindow* window, Player* p, glm::mat4* view, float dt) {
+    float speed = 10 ;
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) { p->h_angle += 0.1f ; }
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) { p->h_angle -= 0.1f ; }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) { p->v_angle -= 0.1f ; }
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) { p->v_angle += 0.1f ; }
+    glm::vec3 dir = glm::vec3(cos(p->v_angle)*sin(p->h_angle), sin(p->v_angle), cos(p->v_angle)*cos(p->h_angle)) ;
+    glm::vec3 right = glm::vec3(sin(p->h_angle - 3.14f/2.0f),0,cos(p->h_angle - 3.14f/2.0f)) ;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) { p->pos += right * dt * speed ; }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) { p->pos -= right * dt * speed ;  }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) { p->pos -= dir * dt * speed ; }
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) { p->pos += dir * dt * speed ; }
+    glm::vec3 up = glm::cross(right, dir) ;
+    *view = glm::lookAt(p->pos, p->pos + dir, up) ;
 }
 
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
