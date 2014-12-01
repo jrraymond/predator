@@ -9,6 +9,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
+#include <unistd.h>
 
 
 #define GLSL(src) "#version 150 core\n" #src
@@ -22,10 +24,12 @@ struct Player {
     float fov;
 };
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
-void render(std::vector<Boid>) ;
 void draw_boid(Boid*) ;
-void handle_input(GLFWwindow* window, Player* p, glm::mat4* view, float dt);
-
+void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr);
+void render(std::vector<Boid>, float* vertices, int boid_s) ;
+bool shader_is_valid(GLuint sp);
+void print_shader_link_info(GLuint sp);
+void print_shader_comp_info(GLuint shader_index);
 
 
 int main() {
@@ -49,12 +53,21 @@ int main() {
         fprintf(stderr, "Failed to initialize GLEW\n") ;
         return -1 ;
     }
-    Player player1 = Player {glm::vec3(10.0f, 10.0f, 10.0f)
+    Player player1 = Player {glm::vec3(10.0f, 10.0f, 0.0f)
                             ,glm::vec3(0.0f, 0.0f, 0.0f)
                             ,glm::vec3(0.0f, 0.0f, 0.0f)
                             ,0.0f,0.0f,45.0f};
+    int params = -1 ;
+    // Boid information
+    int boids_s, boid_s, vert_s, vertices_s, elements_s ;
+    vert_s = 6 ; //for now just position and color info
+    boid_s = 4 ; // four vertices per boid
+    boids_s = 1 ; //for now
+    elements_s = boids_s * boid_s * 3 ; //12
+    vertices_s = boids_s * boid_s * vert_s ; //24
+    std::vector<Boid> boids = generate_boids(1, 1, 1, boids_s) ; //TODO use a C array instead because its more metal
+    debug_boid(&boids[0]) ;
     // ----------------------------- RESOURCES ----------------------------- //
-
     // Create Vertex Array Object
     GLuint vao ;
     glGenVertexArrays(1, &vao) ;
@@ -62,38 +75,38 @@ int main() {
 
     // Create a Vertex Buffer Object and copy the vertex data to it
     GLuint vbo ;
-    glGenBuffers(1, &vbo) ;
+    glGenBuffers(1, &vbo) ; //creates buffer object
     glBindBuffer(GL_ARRAY_BUFFER, vbo) ;
+    //float vertices[vertices_s] ;
+    //glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
     float vertices[] = {
-             1.0f,  1.0f,  1.0f, 0.0f, 0.0f, 1.0f, //near-right-top-0
-             1.0f,  1.0f, -1.0f, 0.0f, 1.0f, 0.0f, //near-right-bot-1
-             1.0f, -1.0f, -1.0f, 1.0f, 0.0f, 0.0f, //near-left-bot-2
-             1.0f, -1.0f,  1.0f, 1.0f, 1.0f, 0.0f, //near-left-top-3
-            -1.0f,  1.0f,  1.0f, 0.0f, 1.0f, 1.0f, //far-right-top-4
-            -1.0f, -1.0f,  1.0f, 0.1f, 0.1f, 0.1f, //far-left-top-5
-            -1.0f,  1.0f, -1.0f, 0.0f, 0.5f, 0.5f, //far-right-bot-6
-            -1.0f, -1.0f, -1.0f, 0.5f, 0.5f, 0.0f, //far-left-bot-7
-    } ;
+            1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+           -1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+           -1.0f,-1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+           -1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+    };
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW) ;
+
     // Create an element array
     GLuint ebo ;
     glGenBuffers(1, &ebo) ;
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo) ;
+    //GLuint elements[elements_s] ;
+    //for (GLuint i=0; i < boids_s; ++i) {
+    //    elements[i] = i ; elements[i+1] = i + 1 ; elements[i+2] = i + 2 ; //side v0,v1,v2
+    //    elements[i+3] = i ; elements[i+4] = i + 2 ; elements[i+5] = i + 3 ; //side v0, v3,v4
+    //    elements[i+6] = i ; elements[i+7] = i + 3 ; elements[i+8] = i + 1 ; //side v0,v4,v2
+    //    elements[i+9] = i + 1 ; elements[i+10] = i + 3 ; elements[i+11] = i + 2 ; //side v1,v3,v2
+    //}
+    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW) ;
     GLuint elements[] = {
-            0, 3, 1, //front-ur,ll
-            1, 3, 2,
-            0, 4, 3, //top-nr,fl
-            5, 3, 4,
-            4, 6, 5, //far-ur,ll
-            5, 6, 7,
-            1, 2, 6, //bottom-nr, fl
-            2, 7, 6,
-            3, 5, 7, //left-fu,nl
-            2, 3, 7,
-            0, 1, 4, //right-nu,fl
-            1, 6, 4
-    } ;
+        0, 1, 2,
+        0, 2, 3,
+        0, 3, 1,
+        1, 3, 2
+    };
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW) ;
+    // TODO parse shaders from file
     // Create and compile the vertex shader
     const char* vertex_src = GLSL(
         uniform mat4 model ;
@@ -110,7 +123,13 @@ int main() {
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER) ;
     glShaderSource(vertex_shader, 1, &vertex_src, NULL) ;
     glCompileShader(vertex_shader) ;
-
+    //check for compilation errors
+    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &params) ;
+    if (GL_TRUE != params) {
+        fprintf (stderr, "ERROR: GL shader index %i did not compile\n", vertex_shader) ;
+        print_shader_comp_info(vertex_shader) ;
+        return EXIT_FAILURE ;
+    }
     // Create and compile the fragment shader
     const char* fragment_src = GLSL(
         in vec3 Color ;
@@ -123,6 +142,13 @@ int main() {
     GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER) ;
     glShaderSource(fragment_shader, 1, &fragment_src, NULL) ;
     glCompileShader(fragment_shader) ;
+    //check for compilation errors
+    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &params) ;
+    if (GL_TRUE != params) {
+        fprintf (stderr, "ERROR: GL shader index %i did not compile\n", fragment_shader) ;
+        print_shader_comp_info(fragment_shader) ;
+        return EXIT_FAILURE ;
+    }
 
 
     // Link the vertex and fragment shader into a shader program
@@ -131,6 +157,17 @@ int main() {
     glAttachShader(shader_prog, fragment_shader) ;
     glBindFragDataLocation(shader_prog, 0, "out_color") ;
     glLinkProgram(shader_prog) ;
+    //check for linking errors
+    glGetProgramiv(shader_prog, GL_LINK_STATUS, &params) ;
+    if (GL_TRUE != params) {
+        fprintf (
+            stderr,
+            "ERROR: could not link shader programme GL index %i\n",
+            shader_prog
+        ) ;
+        print_shader_link_info(shader_prog) ;
+        return EXIT_FAILURE ;
+    }
     glUseProgram(shader_prog) ;
 
     // Specify the layout of the vertex data
@@ -143,8 +180,9 @@ int main() {
 
 
     GLint uni_model = glGetUniformLocation(shader_prog, "model") ;
+    //glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -10.0f)) ;
     glm::mat4 view = glm::lookAt(
-            glm::vec3(1.5f, 1.5f, 1.5f),
+            glm::vec3(10.0f, 10.0f, 10.0f),
             glm::vec3(0.0f, 0.0f, 0.0f),
             glm::vec3(0.0f, 0.0f, 1.0f)
     );
@@ -160,6 +198,9 @@ int main() {
     // ------------------------ Handling Input ----------------------------- //
     float lastTime = glfwGetTime() ;
     float thisTime, deltaTime ;
+   // for (int i=0; i<vertices_s; ++i) { vertices[i] = vertices[i] * 0.2 ; }
+    //glBufferSubData(GL_ARRAY_BUFFER, 0, vertices_s, &vbo) ;
+
     // ---------------------------- RENDERING ------------------------------ //
     while(!glfwWindowShouldClose(window))
     {
@@ -171,8 +212,8 @@ int main() {
         //float adj_factor = sin(time) - 0.5f ;
         //glUniform3f(uni_color, adj_factor, adj_factor, adj_factor) ;
 
-        handle_input(window, &player1, &view, deltaTime) ;
-        glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view));
+        handle_input(window, &player1, deltaTime, &view) ;
+        glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view)) ;
 
         glm::mat4 model ; //simple 2d rotation
         model = glm::rotate(model, 0.0f, glm::vec3(0.0f, 0.0f, 1.0f));
@@ -183,9 +224,23 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) ;
 
         //glDrawArrays(GL_TRIANGLES, 0, 36) ; // Draw a triangle from the 3 vertices glDrawArrays(GL_TRIANGLES, 0, 3) ;
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
+        //glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
+        //render(boids, vertices, boid_s * vert_s) ;
+        glDrawElements(GL_TRIANGLES, elements_s, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
+        //std::cout << "vbo| " ;
+        //for (int i=0; i<vertices_s; ++i) {
+        //    std::cout << vertices[i] << "," ;
+        //}
+        //std::cout << std::endl ;
+        //std::cout << "ebo| " ;
+        //for (int i=0; i<elements_s; ++i) {
+        //    std::cout << elements[i] << "," ;
+        //}
+        //std::cout << std::endl ;
         glfwPollEvents() ;
+        //sleep(1) ;
+        //break ;
     }
     // ---------------------------- CLEARING ------------------------------ //
     glDeleteProgram(shader_prog) ;
@@ -200,7 +255,7 @@ int main() {
     return EXIT_SUCCESS ;
 }
 
-void handle_input(GLFWwindow* window, Player* p, glm::mat4* view, float dt) {
+void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) {
     float speed = 10 ;
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) { p->h_angle += 0.1f ; }
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) { p->h_angle -= 0.1f ; }
@@ -213,9 +268,52 @@ void handle_input(GLFWwindow* window, Player* p, glm::mat4* view, float dt) {
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) { p->pos -= dir * dt * speed ; }
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) { p->pos += dir * dt * speed ; }
     glm::vec3 up = glm::cross(right, dir) ;
-    *view = glm::lookAt(p->pos, p->pos + dir, up) ;
+    *view_ptr = glm::lookAt(p->pos, p->pos + dir, up) ;
 }
 
+void render(std::vector<Boid> boids, float* vertices, int num_vs) {
+    int s = (int) boids.size() ;
+    Boid b ;
+    V3 pos ;
+    V3 t_0, t_1, t_2, v_0, v_1, v_2, v_3 ;
+    int v_i = 0 ;
+    for (int b_i=0; b_i < s; ++b_i) {
+        b = boids[b_i] ;
+        pos = b.pos ;
+        t_0 = b.vel ;
+        normalize(&t_0) ;
+        cross(&t_0, &b.acc, &t_1) ;
+        normalize(&t_1) ;
+        cross(&t_0, &t_1, &t_2) ;
+        add(&pos, &t_0, &v_0) ; //calculate bow vertex
+        scale(-1.0f, &t_0) ; //calculate stern 3 vertices
+        add(&t_0, &t_1, &v_1) ; //up stern vertex
+        add(&t_0, &t_2, &v_2) ; //down stern vertex 1
+        scale(-1.0f, &t_2) ;
+        add(&t_0, &t_2, &v_3) ; //down stern vertex 2
+        vertices[v_i] = v_0.x ;
+        vertices[v_i+1] = v_0.y ;
+        vertices[v_i+2] = v_0.z ;
+        vertices[v_i+3] = 1.0f ; vertices[v_i+4] = 1.0f ; vertices[v_i+5] = 1.0f ;
+        vertices[v_i+6] = v_1.x ;
+        vertices[v_i+7] = v_1.y ;
+        vertices[v_i+8] = v_1.z ;
+        vertices[v_i+9] = 1.0f ; vertices[v_i+10] = 1.0f ; vertices[v_i+11] = 1.0f ;
+        vertices[v_i+12] = v_2.x ;
+        vertices[v_i+13] = v_2.y ;
+        vertices[v_i+14] = v_2.z ;
+        vertices[v_i+15] = 1.0f ; vertices[v_i+16] = 1.0f ; vertices[v_i+17] = 1.0f ;
+        vertices[v_i+18] = v_3.x ;
+        vertices[v_i+19] = v_3.y ;
+        vertices[v_i+20] = v_3.z ;
+        vertices[v_i+21] = 1.0f ; vertices[v_i+22] = 1.0f ; vertices[v_i+23] = 1.0f ; v_i += num_vs ;
+        debug_v3(&v_0, "v_0") ;
+        debug_v3(&v_1, "v_1") ;
+        debug_v3(&v_2, "v_2") ;
+        debug_v3(&v_3, "v_3") ;
+
+    }
+}
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
     std::vector<Boid> boids ;
     boids.reserve(number) ;
@@ -225,19 +323,45 @@ std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
     std::uniform_int_distribution<int>  r_y(0, max_y) ;
     std::uniform_int_distribution<int>  r_z(0, max_z) ;
     int x, y, z ;
+    V3 p, v, a ;
     for (int i = 0 ; i < number ; ++i) {
-        x = r_x(generator) ;
-        y = r_y(generator) ;
-        z = r_z(generator) ;
-        V3 p = V3{(float) x, (float) y, (float) z} ;
-        V3 v = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
-        V3 a = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
+        //x = r_x(generator) ;
+        //y = r_y(generator) ;
+        //z = r_z(generator) ;
+        //p = V3{(float) x, (float) y, (float) z} ;
+        //v = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
+        //a = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
+        p = V3{0.0f, 0.0f, 0.0f} ;
+        v = V3{1.0f, 0.0f, 0.0f} ;
+        a = V3{0.0f, 1.0f, 0.0f} ;
         boids.push_back(Boid {p, v, a}) ;
     }
     return boids ;
 }
 
-void render(std::vector<Boid> boids) {
+
+void print_shader_comp_info(GLuint shader_index) {
+    int max_length = 2048;
+    int actual_length = 0;
+    char log[2048];
+    glGetShaderInfoLog (shader_index, max_length, &actual_length, log);
+    printf ("shader info log for GL index %i:\n%s\n", shader_index, log);
 }
-void draw_boid(Boid* boid) {
+void print_shader_link_info(GLuint sp) {
+    int max_length = 2048;
+    int actual_length = 0;
+    char log[2048];
+    glGetProgramInfoLog (sp, max_length, &actual_length, log);
+    printf ("program info log for GL index %i:\n%s", sp, log);
+}
+bool shader_is_valid(GLuint sp) {
+    int params = -1;
+    glValidateProgram (sp);
+    glGetProgramiv (sp, GL_VALIDATE_STATUS, &params);
+    printf ("program %i GL_VALIDATE_STATUS = %i\n", sp, params);
+    if (GL_TRUE != params) {
+        print_shader_link_info(sp);
+        return false;
+    }
+    return true;
 }

@@ -37,3 +37,6 @@ void normalize(V3* u) {
     u->y = u->y / s ;
     u->z = u->z / s ;
 }
+void debug_v3(V3* v, std::string s) {
+    std::cout << s << "| V3: " << v->x << "," << v->y << "," << v->z << std::endl ;
+}

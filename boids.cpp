@@ -68,3 +68,6 @@ V3 centroid(std::vector<Boid> bs) {
     }
     return V3{x / s, y / s, z / s} ;
 }
+void debug_boid(Boid* b) {
+    std::cout << "Boid: p[" << b->pos.x << "," << b->pos.y << "," << b->pos.z << "]" << std::endl ;
+}

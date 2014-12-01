@@ -2,6 +2,7 @@
 #define BOIDS_H
 #include "vector3.h"
 #include <vector>
+#include <iostream>
 
 struct Boid {
     V3 pos ;
@@ -14,5 +15,6 @@ void seperate(float s, const Boid* b, const std::vector<Boid> bs, V3* sep) ;
 void cohesion(float x, const Boid* b, const std::vector<Boid> bs, V3* coh) ;
 void align(float x, const std::vector<Boid> bs, V3* ali) ;
 V3 centroid(std::vector<Boid> bs) ;
+void debug_boid(Boid* b) ;
 
 #endif
