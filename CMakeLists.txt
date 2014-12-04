@@ -21,12 +21,20 @@ include_directories(${GLEW_INCLUDE_DIR})
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 set(HEADERS vector3.h boids.h)
-set(SOURCE_FILES main.cpp boids.cpp vector3.cpp)
-
+set(SOURCE_FILES main.cpp boids.cpp vector3.cpp vertex_shader.glsl)
 add_executable(flock_herd_school ${SOURCE_FILES})
 
 #target_link_libraries(flock_herd_school ${GLFW_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})
 target_link_libraries(flock_herd_school  ${GLFW_LIBRARIES} X11 Xxf86vm Xrandr pthread Xi ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})
 
-
+set(shaders "vertex_shader.glsl" "fragment_shader.glsl" "grid_vertex_shader.glsl" "grid_fragment_shader.glsl")
+if (NOT CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR)
+    foreach(item IN LISTS shaders)
+        configure_file(
+            ${CMAKE_CURRENT_SOURCE_DIR}/${item}
+            ${CMAKE_CURRENT_BINARY_DIR}/${item}
+            COPYONLY
+        )
+    endforeach()
+endif()
 

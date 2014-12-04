@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <limits>
 #include <random>
 #include <GL/glew.h>
@@ -10,11 +11,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
-#include <unistd.h>
 
-
-#define GLSL(src) "#version 150 core\n" #src
-
+#define MAX_SHADER_SRC_SIZE 4096
+//TODO add lighting
+//TODO draw grid
 struct Player {
     glm::vec3 pos;
     glm::vec3 vel;
@@ -30,6 +30,7 @@ void render(std::vector<Boid>, float* vertices, int boid_s) ;
 bool shader_is_valid(GLuint sp);
 void print_shader_link_info(GLuint sp);
 void print_shader_comp_info(GLuint shader_index);
+bool read_file(const char* f_name, char* str, int max_len);
 
 
 int main() {
@@ -73,6 +74,22 @@ int main() {
     glGenVertexArrays(1, &vao) ;
     glBindVertexArray(vao) ;
 
+    GLuint vbo_grid ; //grid vertex buffer object and vertex index object
+    glGenBuffers(1, &vbo_grid) ;
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_grid) ;
+    int grid_s = 6 ; //(int)pow(2 * grid_max / grid_step + 1,3) ;
+    float grid_pts[] = {
+            1.0f, 0.0f, 0.0f,   -1.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f,    0.0f,-1.0f, 0.0f,
+            0.0f, 0.0f, 1.0f,    0.0f, 0.0f,-1.0f,
+    } ;
+    glBufferData(GL_ARRAY_BUFFER, sizeof(grid_pts), grid_pts, GL_STATIC_DRAW) ;
+    GLuint ebo_grid ;
+    glGenBuffers(1, &ebo_grid) ;
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_grid) ;
+    GLuint grid_is[] = {  0, 1,  2, 3,   4, 5  };
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(grid_is), grid_is, GL_STATIC_DRAW) ;
+
     // Create a Vertex Buffer Object and copy the vertex data to it
     GLuint vbo ;
     glGenBuffers(1, &vbo) ; //creates buffer object
@@ -108,20 +125,11 @@ int main() {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW) ;
     // TODO parse shaders from file
     // Create and compile the vertex shader
-    const char* vertex_src = GLSL(
-        uniform mat4 model ;
-        uniform mat4 proj ;
-        uniform mat4 view ;
-        in vec3 position ;
-        in vec3 color ;
-        out vec3 Color ;
-        void main() {
-            Color = color ;
-            gl_Position = proj * view * model * vec4(position, 1.0) ;
-        }
-    ) ;
+    char vertex_src[MAX_SHADER_SRC_SIZE];
+    if (!read_file("vertex_shader.glsl", vertex_src, MAX_SHADER_SRC_SIZE)) { return EXIT_FAILURE ; }
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER) ;
-    glShaderSource(vertex_shader, 1, &vertex_src, NULL) ;
+    const GLchar* src = (const GLchar*) vertex_src ;
+    glShaderSource(vertex_shader, 1, &src, NULL) ;
     glCompileShader(vertex_shader) ;
     //check for compilation errors
     glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &params) ;
@@ -131,16 +139,11 @@ int main() {
         return EXIT_FAILURE ;
     }
     // Create and compile the fragment shader
-    const char* fragment_src = GLSL(
-        in vec3 Color ;
-        out vec4 out_color ;
-
-        void main() {
-            out_color = vec4(Color, 1.0f) ;
-        }
-    ) ;
+    char fragment_src[MAX_SHADER_SRC_SIZE];
+    read_file("fragment_shader.glsl", fragment_src, MAX_SHADER_SRC_SIZE) ;
     GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER) ;
-    glShaderSource(fragment_shader, 1, &fragment_src, NULL) ;
+    src = (const GLchar*) fragment_src ;
+    glShaderSource(fragment_shader, 1, &src, NULL) ;
     glCompileShader(fragment_shader) ;
     //check for compilation errors
     glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &params) ;
@@ -149,8 +152,34 @@ int main() {
         print_shader_comp_info(fragment_shader) ;
         return EXIT_FAILURE ;
     }
-
-
+    // grid shader
+    char grid_src[MAX_SHADER_SRC_SIZE];
+    read_file("grid_vertex_shader.glsl", grid_src, MAX_SHADER_SRC_SIZE) ;
+    GLuint grid_shader = glCreateShader(GL_VERTEX_SHADER) ;
+    src = (const GLchar*) grid_src ;
+    glShaderSource(grid_shader, 1, &src, NULL) ;
+    glCompileShader(grid_shader) ;
+    //check for compilation errors
+    glGetShaderiv(grid_shader, GL_COMPILE_STATUS, &params) ;
+    if (GL_TRUE != params) {
+        fprintf (stderr, "ERROR: GL shader index %i did not compile\n", grid_shader) ;
+        print_shader_comp_info(grid_shader) ;
+        return EXIT_FAILURE ;
+    }
+    // grid fragment shader
+    char grid_frag_src[MAX_SHADER_SRC_SIZE] ;
+    read_file("grid_fragment_shader.glsl", grid_frag_src, MAX_SHADER_SRC_SIZE) ;
+    GLuint grid_frag_shader = glCreateShader(GL_FRAGMENT_SHADER) ;
+    src = (const GLchar*) grid_frag_src ;
+    glShaderSource(grid_frag_shader, 1, &src, NULL) ;
+    glCompileShader(grid_frag_shader) ;
+    //check for compilation errors
+    glGetShaderiv(grid_frag_shader, GL_COMPILE_STATUS, &params) ;
+    if (GL_TRUE != params) {
+        fprintf (stderr, "ERROR: GL shader index %i did not compile\n", grid_frag_shader) ;
+        print_shader_comp_info(grid_frag_shader) ;
+        return EXIT_FAILURE ;
+    }
     // Link the vertex and fragment shader into a shader program
     GLuint shader_prog = glCreateProgram() ;
     glAttachShader(shader_prog, vertex_shader) ;
@@ -169,16 +198,30 @@ int main() {
         return EXIT_FAILURE ;
     }
     glUseProgram(shader_prog) ;
+    //link the grid shaders into program
+    GLuint grid_shader_prog = glCreateProgram() ;
+    glAttachShader(grid_shader_prog, grid_shader) ;
+    glAttachShader(grid_shader_prog, grid_frag_shader) ;
+    glLinkProgram(grid_shader_prog) ;
+    //check for linking errors
+    glGetProgramiv(grid_shader_prog, GL_LINK_STATUS, &params) ;
+    if (GL_TRUE != params) {
+        fprintf (
+                stderr,
+                "ERROR: could not link shader programme GL index %i\n",
+                grid_shader_prog
+        ) ;
+        print_shader_link_info(grid_shader_prog) ;
+        return EXIT_FAILURE ;
+    }
 
     // Specify the layout of the vertex data
     GLint pos_attr = glGetAttribLocation(shader_prog, "position") ;
     glEnableVertexAttribArray(pos_attr) ;
-    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), 0) ;
     GLint col_attr = glGetAttribLocation(shader_prog, "color") ;
     glEnableVertexAttribArray(col_attr) ;
-    glVertexAttribPointer(col_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))) ;
-
-
+    GLint grid_pt_attr = glGetAttribLocation(grid_shader_prog, "grid_pt") ;
+    glEnableVertexAttribArray(grid_pt_attr) ;
     GLint uni_model = glGetUniformLocation(shader_prog, "model") ;
     //glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -10.0f)) ;
     glm::mat4 view = glm::lookAt(
@@ -202,8 +245,7 @@ int main() {
     //glBufferSubData(GL_ARRAY_BUFFER, 0, vertices_s, &vbo) ;
 
     // ---------------------------- RENDERING ------------------------------ //
-    while(!glfwWindowShouldClose(window))
-    {
+    while(!glfwWindowShouldClose(window)) {
         lastTime = thisTime ;
         thisTime = glfwGetTime() ;
         deltaTime = thisTime - lastTime ;
@@ -212,8 +254,8 @@ int main() {
         //float adj_factor = sin(time) - 0.5f ;
         //glUniform3f(uni_color, adj_factor, adj_factor, adj_factor) ;
 
-        handle_input(window, &player1, deltaTime, &view) ;
-        glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view)) ;
+        //handle_input(window, &player1, deltaTime, &view) ;
+        //glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view)) ;
 
         glm::mat4 model ; //simple 2d rotation
         model = glm::rotate(model, 0.0f, glm::vec3(0.0f, 0.0f, 1.0f));
@@ -223,24 +265,22 @@ int main() {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f) ; // Clear the screen to black
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) ;
 
-        //glDrawArrays(GL_TRIANGLES, 0, 36) ; // Draw a triangle from the 3 vertices glDrawArrays(GL_TRIANGLES, 0, 3) ;
-        //glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
+        glUseProgram(shader_prog) ;
+        glBindBuffer(GL_ARRAY_BUFFER, vbo) ;
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo) ;
+        glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), 0) ;
+        glVertexAttribPointer(col_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))) ;
         //render(boids, vertices, boid_s * vert_s) ;
         glDrawElements(GL_TRIANGLES, elements_s, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
+
+        glUseProgram(grid_shader_prog) ; //TODO these aren't drawing right now has something to do with VAO
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_grid) ;
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_grid) ;
+        glVertexAttribPointer(grid_pt_attr, 2, GL_FLOAT, GL_FALSE, 0, 0) ;
+        glDrawElements(GL_LINES, 3, GL_UNSIGNED_INT, 0) ;
+
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
-        //std::cout << "vbo| " ;
-        //for (int i=0; i<vertices_s; ++i) {
-        //    std::cout << vertices[i] << "," ;
-        //}
-        //std::cout << std::endl ;
-        //std::cout << "ebo| " ;
-        //for (int i=0; i<elements_s; ++i) {
-        //    std::cout << elements[i] << "," ;
-        //}
-        //std::cout << std::endl ;
         glfwPollEvents() ;
-        //sleep(1) ;
-        //break ;
     }
     // ---------------------------- CLEARING ------------------------------ //
     glDeleteProgram(shader_prog) ;
@@ -364,4 +404,32 @@ bool shader_is_valid(GLuint sp) {
         return false;
     }
     return true;
+}
+
+
+bool read_file(const char* f_name, char* str, int max_len) {
+    FILE* fp = fopen(f_name , "r") ;
+    int len = 0 ;
+    char line[80] ;
+
+    str[0] = '\0' ;
+    if (fp == NULL) {
+        fprintf(stderr, "ERROR: error opening file: %s\n", f_name) ;
+        return false ;
+    }
+    strcpy(line, "") ;
+    while (!feof(fp)) {
+        if (NULL != fgets(line, 80, fp)) {
+            len += strlen(line) ;
+            if (len >= max_len) {
+                fprintf(stderr, "ERROR: file length greater than max length: %i", max_len ) ;
+            }
+            strcat(str, line) ;
+        }
+    }
+    if (fclose(fp) == EOF) {
+        fprintf(stderr, "ERROR: closing file %s\n", f_name) ;
+        return false ;
+    }
+    return true ;
 }
