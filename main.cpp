@@ -25,12 +25,14 @@ struct Player {
 };
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
 void draw_boid(Boid*) ;
-void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr);
+void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
 void render(std::vector<Boid>, float* vertices, int boid_s) ;
 bool shader_is_valid(GLuint sp);
 void print_shader_link_info(GLuint sp);
 void print_shader_comp_info(GLuint shader_index);
 bool read_file(const char* f_name, char* str, int max_len);
+bool compile_shader(const char* f_name, GLuint shader) ;
+bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) ;
 
 
 int main() {
@@ -123,97 +125,23 @@ int main() {
         1, 3, 2
     };
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW) ;
-    // TODO parse shaders from file
-    // Create and compile the vertex shader
-    char vertex_src[MAX_SHADER_SRC_SIZE];
-    if (!read_file("vertex_shader.glsl", vertex_src, MAX_SHADER_SRC_SIZE)) { return EXIT_FAILURE ; }
+    // compile all the shaders
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER) ;
-    const GLchar* src = (const GLchar*) vertex_src ;
-    glShaderSource(vertex_shader, 1, &src, NULL) ;
-    glCompileShader(vertex_shader) ;
-    //check for compilation errors
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &params) ;
-    if (GL_TRUE != params) {
-        fprintf (stderr, "ERROR: GL shader index %i did not compile\n", vertex_shader) ;
-        print_shader_comp_info(vertex_shader) ;
-        return EXIT_FAILURE ;
-    }
-    // Create and compile the fragment shader
-    char fragment_src[MAX_SHADER_SRC_SIZE];
-    read_file("fragment_shader.glsl", fragment_src, MAX_SHADER_SRC_SIZE) ;
+    compile_shader("vertex_shader.glsl", vertex_shader) ;
     GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER) ;
-    src = (const GLchar*) fragment_src ;
-    glShaderSource(fragment_shader, 1, &src, NULL) ;
-    glCompileShader(fragment_shader) ;
-    //check for compilation errors
-    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &params) ;
-    if (GL_TRUE != params) {
-        fprintf (stderr, "ERROR: GL shader index %i did not compile\n", fragment_shader) ;
-        print_shader_comp_info(fragment_shader) ;
-        return EXIT_FAILURE ;
-    }
-    // grid shader
-    char grid_src[MAX_SHADER_SRC_SIZE];
-    read_file("grid_vertex_shader.glsl", grid_src, MAX_SHADER_SRC_SIZE) ;
+    compile_shader("fragment_shader.glsl", fragment_shader) ;
     GLuint grid_shader = glCreateShader(GL_VERTEX_SHADER) ;
-    src = (const GLchar*) grid_src ;
-    glShaderSource(grid_shader, 1, &src, NULL) ;
-    glCompileShader(grid_shader) ;
-    //check for compilation errors
-    glGetShaderiv(grid_shader, GL_COMPILE_STATUS, &params) ;
-    if (GL_TRUE != params) {
-        fprintf (stderr, "ERROR: GL shader index %i did not compile\n", grid_shader) ;
-        print_shader_comp_info(grid_shader) ;
-        return EXIT_FAILURE ;
-    }
-    // grid fragment shader
-    char grid_frag_src[MAX_SHADER_SRC_SIZE] ;
-    read_file("grid_fragment_shader.glsl", grid_frag_src, MAX_SHADER_SRC_SIZE) ;
+    compile_shader("grid_vertex_shader.glsl", grid_shader) ;
     GLuint grid_frag_shader = glCreateShader(GL_FRAGMENT_SHADER) ;
-    src = (const GLchar*) grid_frag_src ;
-    glShaderSource(grid_frag_shader, 1, &src, NULL) ;
-    glCompileShader(grid_frag_shader) ;
-    //check for compilation errors
-    glGetShaderiv(grid_frag_shader, GL_COMPILE_STATUS, &params) ;
-    if (GL_TRUE != params) {
-        fprintf (stderr, "ERROR: GL shader index %i did not compile\n", grid_frag_shader) ;
-        print_shader_comp_info(grid_frag_shader) ;
-        return EXIT_FAILURE ;
-    }
+    compile_shader("grid_fragment_shader.glsl", grid_frag_shader) ;
     // Link the vertex and fragment shader into a shader program
     GLuint shader_prog = glCreateProgram() ;
-    glAttachShader(shader_prog, vertex_shader) ;
-    glAttachShader(shader_prog, fragment_shader) ;
+    link_shader(shader_prog, {vertex_shader, fragment_shader}) ;
     glBindFragDataLocation(shader_prog, 0, "out_color") ;
-    glLinkProgram(shader_prog) ;
-    //check for linking errors
-    glGetProgramiv(shader_prog, GL_LINK_STATUS, &params) ;
-    if (GL_TRUE != params) {
-        fprintf (
-            stderr,
-            "ERROR: could not link shader programme GL index %i\n",
-            shader_prog
-        ) ;
-        print_shader_link_info(shader_prog) ;
-        return EXIT_FAILURE ;
-    }
     glUseProgram(shader_prog) ;
     //link the grid shaders into program
     GLuint grid_shader_prog = glCreateProgram() ;
-    glAttachShader(grid_shader_prog, grid_shader) ;
-    glAttachShader(grid_shader_prog, grid_frag_shader) ;
-    glLinkProgram(grid_shader_prog) ;
-    //check for linking errors
-    glGetProgramiv(grid_shader_prog, GL_LINK_STATUS, &params) ;
-    if (GL_TRUE != params) {
-        fprintf (
-                stderr,
-                "ERROR: could not link shader programme GL index %i\n",
-                grid_shader_prog
-        ) ;
-        print_shader_link_info(grid_shader_prog) ;
-        return EXIT_FAILURE ;
-    }
+    link_shader(grid_shader_prog, {grid_shader, grid_frag_shader}) ;
 
     // Specify the layout of the vertex data
     GLint pos_attr = glGetAttribLocation(shader_prog, "position") ;
@@ -429,6 +357,41 @@ bool read_file(const char* f_name, char* str, int max_len) {
     }
     if (fclose(fp) == EOF) {
         fprintf(stderr, "ERROR: closing file %s\n", f_name) ;
+        return false ;
+    }
+    return true ;
+}
+/* compiles a shader given file name containing source and shader index */
+bool compile_shader(const char* f_name, GLuint shader) {
+    GLint status ;
+    char src[MAX_SHADER_SRC_SIZE] ;
+    if (!read_file(f_name, src, MAX_SHADER_SRC_SIZE)) {  return false ;  }
+    const GLchar* glsrc = (const GLchar*) src ;
+    glShaderSource(shader, 1, &glsrc, NULL) ;
+    glCompileShader(shader) ;
+    //check for compilation errors
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &status) ;
+    if (GL_TRUE != status) {
+        fprintf(stderr, "ERROR: GL shader %s index %i did not compile\n", f_name, shader) ;
+        print_shader_comp_info(shader) ;
+        return false ;
+    }
+    return true ;
+}
+bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) {
+    GLint status ;
+    for(auto x : shaders) {
+        glAttachShader(prog, x) ;
+    }
+    glLinkProgram(prog) ;
+    glGetProgramiv(prog, GL_LINK_STATUS, &status) ;
+    if (GL_TRUE != status) {
+        fprintf(
+                stderr,
+                "ERROR: could not link shader programme GL index %i\n",
+                prog
+        );
+        print_shader_link_info(prog) ;
         return false ;
     }
     return true ;
