@@ -15,14 +15,15 @@
 #define MAX_SHADER_SRC_SIZE 4096
 //TODO add lighting
 //TODO draw grid
+enum Axis  { X_AXIS, Y_AXIS, Z_AXIS } ;
 struct Player {
-    glm::vec3 pos;
-    glm::vec3 vel;
-    glm::vec3 acc;
-    float h_angle;
-    float v_angle;
-    float fov;
-};
+    glm::vec3 pos ;
+    glm::vec3 vel ;
+    glm::vec3 acc ;
+    float h_angle ;
+    float v_angle ;
+    float fov ;
+} ;
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
 void draw_boid(Boid*) ;
 void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
@@ -33,6 +34,7 @@ void print_shader_comp_info(GLuint shader_index);
 bool read_file(const char* f_name, char* str, int max_len);
 bool compile_shader(const char* f_name, GLuint shader) ;
 bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) ;
+float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) ;
 
 
 int main() {
@@ -133,26 +135,14 @@ int main() {
     GLuint vbo_grid ; //grid vertex buffer object and vertex index object
     glGenBuffers(1, &vbo_grid) ;
     glBindBuffer(GL_ARRAY_BUFFER, vbo_grid) ;
-    //int grid_s = 6 ; //(int)pow(2 * grid_max / grid_step + 1,3) ;
-    float grid_pts[] = {
-            100.0f,   0.0f,   0.0f,    1.0f, 0.0f, 0.0f,      -100.0f,   0.0f,   0.0f,    1.0f, 0.0f, 0.0f,
-            0.0f, 100.0f,   0.0f,    0.0f, 1.0f, 0.0f,         0.0f,-100.0f,   0.0f,    0.0f, 1.0f, 0.0f,
-            0.0f,   0.0f, 100.0f,    0.0f, 0.0f, 1.0f,         0.0f,   0.0f,-100.0f,    0.0f, 0.0f, 1.0f,
-    } ;
-    glBufferData(GL_ARRAY_BUFFER, sizeof(grid_pts), grid_pts, GL_STATIC_DRAW) ;
-    GLuint ebo_grid ;
-    glGenBuffers(1, &ebo_grid) ;
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_grid) ;
-
-    GLuint grid_is[] = {  0, 1,  2, 3,   4, 5  };
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(grid_is), grid_is, GL_STATIC_DRAW) ;
+    float* grid_xz ;
+    int grid_size, grid_num_pts ;
+    grid_xz = gen_2d_grid(&grid_size, &grid_num_pts, 100, 1, Y_AXIS, 0.0f) ;
+    glBufferData(GL_ARRAY_BUFFER, grid_size, grid_xz, GL_STATIC_DRAW) ;
 
     glEnableVertexAttribArray(pos_attr) ;
-    glEnableVertexAttribArray(col_attr) ;
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_grid) ;
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_grid) ;
-    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (void*) 0) ;
-    glVertexAttribPointer(col_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (void*)(3 * sizeof(GLfloat))) ;
+    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;
+    glVertexAttrib3f(col_attr, 1.0f, 0.0f, 0.0f) ;
 
     glm::mat4 model = glm::mat4() ;
     glm::mat4 view = glm::lookAt(
@@ -167,7 +157,6 @@ int main() {
     GLint uni_proj = glGetUniformLocation(shader_prog, "proj") ;
     glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(uni_proj, 1, GL_FALSE, glm::value_ptr(proj));
-
     //depth
     glEnable(GL_DEPTH_TEST) ;
 
@@ -188,7 +177,6 @@ int main() {
         //glUniform3f(uni_color, adj_factor, adj_factor, adj_factor) ;
 
         handle_input(window, &player1, deltaTime, &view) ;
-        glUseProgram(shader_prog) ;
         glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view)) ;
         glUniformMatrix4fv(uni_model, 1, GL_FALSE, glm::value_ptr(model));
 
@@ -200,12 +188,13 @@ int main() {
         glDrawElements(GL_TRIANGLES, elements_s, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
 
         glBindVertexArray(vao_grid) ;
-        glDrawElements(GL_LINES, 6, GL_UNSIGNED_INT, 0) ;
+        glDrawArrays(GL_LINES, 0, grid_num_pts) ;
 
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
     }
     // ---------------------------- CLEARING ------------------------------ //
+    free(grid_xz) ;
     glDeleteProgram(shader_prog) ;
     glDeleteShader(fragment_shader) ;
     glDeleteShader(vertex_shader) ;
@@ -396,4 +385,70 @@ bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) {
         return false ;
     }
     return true ;
+}
+
+
+float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) {
+    int vert_s = 3 ;
+    *num_pts = (2 * dim / step + 1) * 4 ;
+    *size = *num_pts * vert_s * (int) sizeof(float) ;
+    float* pts = (float*) malloc((size_t)*size) ;
+    int i = 0 ;
+    switch (fixed_axis) {
+        case X_AXIS :
+            for (int y = -dim; y <= dim; y += step) {
+                pts[i++] = fixed_at ;
+                pts[i++] = (float) y ;
+                pts[i++] = (float) -dim ;
+                pts[i++] = fixed_at ;
+                pts[i++] = (float) y ; //repeat for grid max
+                pts[i++] = (float) dim ;
+            }
+            for (int z = -dim; z <= dim; z += step) { //now fix x
+                pts[i++] = fixed_at ;
+                pts[i++] = (float) -dim ;
+                pts[i++] = (float) z ;
+                pts[i++] = fixed_at ;
+                pts[i++] = (float) dim ;
+                pts[i++] = (float) z ;
+            }
+            break ;
+        case Y_AXIS:
+            for (int x = -dim; x <= dim; x += step) {
+                pts[i++] = (float) x ;
+                pts[i++] = fixed_at ;
+                pts[i++] = (float) -dim ;
+                pts[i++] = (float) x ;
+                pts[i++] = fixed_at ;
+                pts[i++] = (float) dim ;
+            }
+            for (int z = -dim; z <= dim; z += step) {
+                pts[i++] = (float) -dim ;
+                pts[i++] = fixed_at ;
+                pts[i++] = (float) z ;
+                pts[i++] = (float) dim ;
+                pts[i++] = fixed_at ;
+                pts[i++] = (float) z ;
+            }
+            break ;
+        case Z_AXIS:
+            for (int x = -dim; x <= dim; x += step) {
+                pts[i++] = (float) x ;
+                pts[i++] = (float) -dim ;
+                pts[i++] = fixed_at ;
+                pts[i++] = (float) x ;
+                pts[i++] = (float) dim ;
+                pts[i++] = fixed_at ;
+            }
+            for (int y = -dim; y <= dim; y += step) { //now fix x
+                pts[i++] = (float) -dim ;
+                pts[i++] = (float) y ;
+                pts[i++] = fixed_at ;
+                pts[i++] = (float) dim ;
+                pts[i++] = (float) y ;
+                pts[i++] = fixed_at ;
+            }
+            break ;
+    }
+    return pts ;
 }
