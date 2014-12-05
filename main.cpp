@@ -71,7 +71,17 @@ int main() {
     std::vector<Boid> boids = generate_boids(1, 1, 1, boids_s) ; //TODO use a C array instead because its more metal
     debug_boid(&boids[0]) ;
     // ----------------------------- RESOURCES ----------------------------- //
-    // Create Vertex Array Object TODO actually use these
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER) ; //Create, compile, link shader
+    compile_shader("vertex_shader.glsl", vertex_shader) ;
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER) ;
+    compile_shader("fragment_shader.glsl", fragment_shader) ;
+    GLuint shader_prog = glCreateProgram() ;
+    link_shader(shader_prog, {vertex_shader, fragment_shader}) ;
+    glUseProgram(shader_prog) ;
+    GLint pos_attr = glGetAttribLocation(shader_prog, "position") ;
+    GLint col_attr = glGetAttribLocation(shader_prog, "color_in") ;
+    
+    // Create Vertex Array Object
     GLuint vao_boids ; //boids
     glGenVertexArrays(1, &vao_boids) ;
 
@@ -112,19 +122,7 @@ int main() {
         1, 3, 2
     };
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW) ;
-    //create the shader program for boid
-    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER) ;
-    compile_shader("vertex_shader.glsl", vertex_shader) ;
-    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER) ;
-    compile_shader("fragment_shader.glsl", fragment_shader) ;
-    GLuint shader_prog = glCreateProgram() ;
-    link_shader(shader_prog, {vertex_shader, fragment_shader}) ;
-    glBindFragDataLocation(shader_prog, 0, "out_color") ;
-    glUseProgram(shader_prog) ;
-    // Specify the layout of the vertex data
-    GLint pos_attr = glGetAttribLocation(shader_prog, "position") ;
     glEnableVertexAttribArray(pos_attr) ;
-    GLint col_attr = glGetAttribLocation(shader_prog, "color") ;
     glEnableVertexAttribArray(col_attr) ;
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo) ;
@@ -149,21 +147,12 @@ int main() {
     GLuint grid_is[] = {  0, 1,  2, 3,   4, 5  };
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(grid_is), grid_is, GL_STATIC_DRAW) ;
 
-    //create shader program for grid
-    GLuint grid_shader = glCreateShader(GL_VERTEX_SHADER) ;
-    compile_shader("grid_vertex_shader.glsl", grid_shader) ;
-    GLuint grid_frag_shader = glCreateShader(GL_FRAGMENT_SHADER) ;
-    compile_shader("grid_fragment_shader.glsl", grid_frag_shader) ;
-    GLuint grid_shader_prog = glCreateProgram() ;
-    link_shader(grid_shader_prog, {grid_shader, grid_frag_shader}) ;
-    glUseProgram(grid_shader_prog) ;
-    GLint grid_pt_attr = glGetAttribLocation(grid_shader_prog, "grid_pt") ;
-    glEnableVertexAttribArray(grid_pt_attr) ;
-    glEnableVertexAttribArray(1) ;
+    glEnableVertexAttribArray(pos_attr) ;
+    glEnableVertexAttribArray(col_attr) ;
     glBindBuffer(GL_ARRAY_BUFFER, vbo_grid) ;
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_grid) ;
-    glVertexAttribPointer(grid_pt_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (void*) 0) ;
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (void*)(3 * sizeof(GLfloat))) ;
+    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (void*) 0) ;
+    glVertexAttribPointer(col_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (void*)(3 * sizeof(GLfloat))) ;
 
     glm::mat4 model = glm::mat4() ;
     glm::mat4 view = glm::lookAt(
@@ -172,19 +161,12 @@ int main() {
             glm::vec3(0.0f, 0.0f, 1.0f)
     ) ;
     glm::mat4 proj = (glm::mat4) glm::perspective(45.0f, 800.0f / 600.0f, 0.1f, 100.0f);
-    glUseProgram(shader_prog) ;
+
     GLint uni_model = glGetUniformLocation(shader_prog, "model") ;
     GLint uni_view = glGetUniformLocation(shader_prog, "view") ;
     GLint uni_proj = glGetUniformLocation(shader_prog, "proj") ;
     glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(uni_proj, 1, GL_FALSE, glm::value_ptr(proj));
-
-    glUseProgram(grid_shader_prog) ;
-    GLint uni_model_grid = glGetUniformLocation(grid_shader_prog, "model") ;
-    GLint uni_view_grid = glGetUniformLocation(grid_shader_prog, "view") ;
-    GLint uni_proj_grid = glGetUniformLocation(grid_shader_prog, "proj") ;
-    glUniformMatrix4fv(uni_view_grid, 1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(uni_proj_grid, 1, GL_FALSE, glm::value_ptr(proj));
 
     //depth
     glEnable(GL_DEPTH_TEST) ;
@@ -210,20 +192,14 @@ int main() {
         glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view)) ;
         glUniformMatrix4fv(uni_model, 1, GL_FALSE, glm::value_ptr(model));
 
-        glUseProgram(grid_shader_prog) ;
-        glUniformMatrix4fv(uni_view_grid, 1, GL_FALSE, glm::value_ptr(view)) ;
-        glUniformMatrix4fv(uni_model_grid, 1, GL_FALSE, glm::value_ptr(model));
-
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f) ; // Clear the screen to black
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) ;
 
         glBindVertexArray(vao_boids) ;
-        glUseProgram(shader_prog) ;
         //render(boids, vertices, boid_s * vert_s) ;
         glDrawElements(GL_TRIANGLES, elements_s, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
 
         glBindVertexArray(vao_grid) ;
-        glUseProgram(grid_shader_prog) ;
         glDrawElements(GL_LINES, 6, GL_UNSIGNED_INT, 0) ;
 
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
@@ -233,9 +209,6 @@ int main() {
     glDeleteProgram(shader_prog) ;
     glDeleteShader(fragment_shader) ;
     glDeleteShader(vertex_shader) ;
-    glDeleteProgram(grid_shader_prog) ;
-    glDeleteShader(grid_frag_shader) ;
-    glDeleteShader(grid_shader) ;
     glDeleteBuffers(1, &vbo_boids) ;
     glDeleteBuffers(1, &vbo_grid) ;
     glDeleteVertexArrays(1, &vao_boids) ;

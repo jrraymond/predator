@@ -27,7 +27,7 @@ add_executable(flock_herd_school ${SOURCE_FILES})
 #target_link_libraries(flock_herd_school ${GLFW_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})
 target_link_libraries(flock_herd_school  ${GLFW_LIBRARIES} X11 Xxf86vm Xrandr pthread Xi ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})
 
-set(shaders "vertex_shader.glsl" "fragment_shader.glsl" "grid_vertex_shader.glsl" "grid_fragment_shader.glsl")
+set(shaders "vertex_shader.glsl" "fragment_shader.glsl")
 if (NOT CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR)
     foreach(item IN LISTS shaders)
         configure_file(
