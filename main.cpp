@@ -71,16 +71,18 @@ int main() {
     std::vector<Boid> boids = generate_boids(1, 1, 1, boids_s) ; //TODO use a C array instead because its more metal
     debug_boid(&boids[0]) ;
     // ----------------------------- RESOURCES ----------------------------- //
-    // Create Vertex Array Object
-    GLuint vao ;
-    glGenVertexArrays(1, &vao) ;
-    glBindVertexArray(vao) ;
+    // Create Vertex Array Object TODO actually use these
+    GLuint vao_boids ; //boids
+    glGenVertexArrays(1, &vao_boids) ;
 
+    GLuint vao_grid ; //grid
+    glGenVertexArrays(1, &vao_grid) ;
 
+    glBindVertexArray(vao_boids) ;
     // Create a Vertex Buffer Object and copy the vertex data to it
-    GLuint vbo ;
-    glGenBuffers(1, &vbo) ; //creates buffer object
-    glBindBuffer(GL_ARRAY_BUFFER, vbo) ;
+    GLuint vbo_boids ;
+    glGenBuffers(1, &vbo_boids) ; //creates buffer object
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
     //float vertices[vertices_s] ;
     //glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
     float vertices[] = {
@@ -124,7 +126,12 @@ int main() {
     glEnableVertexAttribArray(pos_attr) ;
     GLint col_attr = glGetAttribLocation(shader_prog, "color") ;
     glEnableVertexAttribArray(col_attr) ;
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo) ;
+    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), 0) ;
+    glVertexAttribPointer(col_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))) ;
 
+    glBindVertexArray(vao_grid) ;
     GLuint vbo_grid ; //grid vertex buffer object and vertex index object
     glGenBuffers(1, &vbo_grid) ;
     glBindBuffer(GL_ARRAY_BUFFER, vbo_grid) ;
@@ -153,6 +160,10 @@ int main() {
     GLint grid_pt_attr = glGetAttribLocation(grid_shader_prog, "grid_pt") ;
     glEnableVertexAttribArray(grid_pt_attr) ;
     glEnableVertexAttribArray(1) ;
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_grid) ;
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_grid) ;
+    glVertexAttribPointer(grid_pt_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (void*) 0) ;
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (void*)(3 * sizeof(GLfloat))) ;
 
     glm::mat4 model = glm::mat4() ;
     glm::mat4 view = glm::lookAt(
@@ -206,35 +217,29 @@ int main() {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f) ; // Clear the screen to black
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) ;
 
+        glBindVertexArray(vao_boids) ;
         glUseProgram(shader_prog) ;
-        glBindBuffer(GL_ARRAY_BUFFER, vbo) ;
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo) ;
-        glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), 0) ;
-        glVertexAttribPointer(col_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))) ;
         //render(boids, vertices, boid_s * vert_s) ;
         glDrawElements(GL_TRIANGLES, elements_s, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
 
+        glBindVertexArray(vao_grid) ;
         glUseProgram(grid_shader_prog) ;
-        glEnableVertexAttribArray(0) ;
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_grid) ;
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_grid) ;
-        glVertexAttribPointer(grid_pt_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (void*) 0) ;
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (void*)(3 * sizeof(GLfloat))) ;
         glDrawElements(GL_LINES, 6, GL_UNSIGNED_INT, 0) ;
 
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
     }
     // ---------------------------- CLEARING ------------------------------ //
-    //glDeleteProgram(shader_prog) ;
-    //glDeleteShader(fragment_shader) ;
-    //glDeleteShader(vertex_shader) ;
+    glDeleteProgram(shader_prog) ;
+    glDeleteShader(fragment_shader) ;
+    glDeleteShader(vertex_shader) ;
     glDeleteProgram(grid_shader_prog) ;
     glDeleteShader(grid_frag_shader) ;
     glDeleteShader(grid_shader) ;
-    //glDeleteBuffers(1, &vbo) ;
+    glDeleteBuffers(1, &vbo_boids) ;
     glDeleteBuffers(1, &vbo_grid) ;
-    glDeleteVertexArrays(1, &vao) ;
+    glDeleteVertexArrays(1, &vao_boids) ;
+    glDeleteVertexArrays(1, &vao_grid) ;
 
     // ---------------------------- TERMINATE ----------------------------- //
     glfwTerminate() ;
@@ -244,12 +249,16 @@ int main() {
 
 void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) {
     float speed = 10 ;
-    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) { p->h_angle += 0.1f ; }
-    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) { p->h_angle -= 0.1f ; }
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) { p->h_angle -= 0.1f ; }
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) { p->h_angle += 0.1f ; }
     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) { p->v_angle -= 0.1f ; }
     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) { p->v_angle += 0.1f ; }
-    glm::vec3 dir = glm::vec3(cos(p->v_angle)*sin(p->h_angle), sin(p->v_angle), cos(p->v_angle)*cos(p->h_angle)) ;
-    glm::vec3 right = glm::vec3(sin(p->h_angle - 3.14f/2.0f),0,cos(p->h_angle - 3.14f/2.0f)) ;
+    glm::vec3 dir = glm::vec3( cos(p->v_angle) * sin(p->h_angle)
+                             , sin(p->v_angle)
+                             , cos(p->v_angle) * cos(p->h_angle)) ;
+    glm::vec3 right = glm::vec3( sin(p->h_angle - 3.14f/2.0f)
+                               , 0
+                               , cos(p->h_angle - 3.14f/2.0f)) ;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) { p->pos += right * dt * speed ; }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) { p->pos -= right * dt * speed ;  }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) { p->pos -= dir * dt * speed ; }
