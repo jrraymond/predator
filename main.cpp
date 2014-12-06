@@ -24,10 +24,15 @@ struct Player {
     float v_angle ;
     float fov ;
 } ;
+struct Vtx {
+    V3 position ;
+    V3 color ;
+    V3 normal ;
+} ;
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
 void draw_boid(Boid*) ;
 void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
-void render(std::vector<Boid>, float* vertices, int boid_s) ;
+void render(std::vector<Boid>, Vtx * vertices, int boid_s) ;
 bool shader_is_valid(GLuint sp);
 void print_shader_link_info(GLuint sp);
 void print_shader_comp_info(GLuint shader_index);
@@ -66,10 +71,9 @@ int main() {
     int params = -1 ;
     // Boid information
     int boids_s, boid_s, vert_s, vertices_s, elements_s ;
-    vert_s = 6 ; //for now just position and color info
-    boid_s = 4 ; // four vertices per boid
+    vert_s = sizeof(Vtx) ; //for now just position and color info
+    boid_s = 12 ; // 12 vertices per boid (4 triangles by 3 verteces)
     boids_s = 1 ; //for now
-    elements_s = boids_s * boid_s * 3 ; //12
     vertices_s = boids_s * boid_s * vert_s ; //24
     std::vector<Boid> boids = generate_boids(10, 10, 10, boids_s) ; //TODO use a C array instead because its more metal
     debug_boid(&boids[0]) ;
@@ -83,6 +87,7 @@ int main() {
     glUseProgram(shader_prog) ;
     GLint pos_attr = glGetAttribLocation(shader_prog, "position") ;
     GLint col_attr = glGetAttribLocation(shader_prog, "color_in") ;
+    GLint nor_attr = glGetAttribLocation(shader_prog, "normal") ;
 
     // Create Vertex Array Object
     GLuint vao_boids ; //boids
@@ -98,35 +103,17 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
     //float vertices[vertices_s] ;
     //glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
-    float vertices[4*6] ;
+    Vtx vertices[3*4*sizeof(Vtx)] ;
     render(boids, vertices, 4*6) ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW) ;
 
-    // Create an element array
-    GLuint ebo ;
-    glGenBuffers(1, &ebo) ;
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo) ;
-    //GLuint elements[elements_s] ;
-    //for (GLuint i=0; i < boids_s; ++i) {
-    //    elements[i] = i ; elements[i+1] = i + 1 ; elements[i+2] = i + 2 ; //side v0,v1,v2
-    //    elements[i+3] = i ; elements[i+4] = i + 2 ; elements[i+5] = i + 3 ; //side v0, v3,v4
-    //    elements[i+6] = i ; elements[i+7] = i + 3 ; elements[i+8] = i + 1 ; //side v0,v4,v2
-    //    elements[i+9] = i + 1 ; elements[i+10] = i + 3 ; elements[i+11] = i + 2 ; //side v1,v3,v2
-    //}
-    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW) ;
-    GLuint elements[] = {
-        0, 1, 2,
-        0, 2, 3,
-        0, 3, 1,
-        1, 3, 2
-    };
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW) ;
     glEnableVertexAttribArray(pos_attr) ;
     glEnableVertexAttribArray(col_attr) ;
+    glEnableVertexAttribArray(nor_attr) ;
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo) ;
-    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), 0) ;
-    glVertexAttribPointer(col_attr, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))) ;
+    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, sizeof(Vtx), 0) ;
+    glVertexAttribPointer(col_attr, 3, GL_FLOAT, GL_FALSE, sizeof(Vtx), (void*)(3 * sizeof(GLfloat))) ;
+    glVertexAttribPointer(nor_attr, 3, GL_FLOAT, GL_TRUE, sizeof(Vtx), (void*)(6 * sizeof(GLfloat))) ;
 
     glBindVertexArray(vao_grid) ;
     GLuint vbo_grid ; //grid vertex buffer object and vertex index object
@@ -134,7 +121,7 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, vbo_grid) ;
     int grid_size, grid_num_pts ;
     float* grid_xyz = gen_2d_grid(&grid_size, &grid_num_pts, 10, 1, Y_AXIS, 0.0f) ;
-    //float* grid_xyz = gen_3d_grid(&grid_size, &grid_num_pts, 100, 10) ;
+    //float* grid_xyz = gen_3d_grid(&grid_size, &grid_num_pts, 10, 1) ;
     glBufferData(GL_ARRAY_BUFFER, grid_size, grid_xyz, GL_STATIC_DRAW) ;
 
     glEnableVertexAttribArray(pos_attr) ;
@@ -157,6 +144,10 @@ int main() {
     GLint uni_amb = glGetUniformLocation(shader_prog, "ambient") ;
     glm::vec3 ambient_light (0.5f, 0.5f, 0.5f) ;
     glUniform3fv(uni_amb, 1, &ambient_light[0]) ;
+    GLint uni_light = glGetUniformLocation(shader_prog, "light") ;
+    glm::vec3 light_pos (player1.pos.x, player1.pos.y, player1.pos.z) ;
+    glUniform3fv(uni_light, 1, &light_pos[0]) ;
+    //TODO add diffuse and specular lighting
 
     glEnable(GL_DEPTH_TEST) ;
 
@@ -186,6 +177,7 @@ int main() {
         glBindVertexArray(vao_boids) ;
         //render(boids, vertices, boid_s * vert_s) ;
         glDrawElements(GL_TRIANGLES, elements_s, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
+        glDrawArrays(GL_TRIANGLES, 0, boids_s * boid_s) ;
 
         glBindVertexArray(vao_grid) ;
         glDrawArrays(GL_LINES, 0, grid_num_pts) ;
@@ -229,11 +221,13 @@ void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) 
     *view_ptr = glm::lookAt(p->pos, p->pos + dir, up) ;
 }
 
-void render(std::vector<Boid> boids, float* vertices, int num_vs) {
+void render(std::vector<Boid> boids, Vtx* vertices, int num_vs) {
     int s = (int) boids.size() ;
+    Vtx vtx_0, vtx_1, vtx_2, vtx_3 ; //4 vertices per triangle
     Boid b ;
     V3 pos ;
     V3 t_0, t_1, t_2, v_0, v_1, v_2, v_3 ;
+    V3 e_0, e_1,n ;
     int v_i = 0 ;
     for (int b_i=0; b_i < s; ++b_i) {
         b = boids[b_i] ;
@@ -251,27 +245,51 @@ void render(std::vector<Boid> boids, float* vertices, int num_vs) {
         normalize(&v_1) ;
         normalize(&v_2) ;
         normalize(&v_3) ;
-        vertices[v_i] = v_0.x ;
-        vertices[v_i+1] = v_0.y ;
-        vertices[v_i+2] = v_0.z ;
-        vertices[v_i+3] = 1.0f ; vertices[v_i+4] = 1.0f ; vertices[v_i+5] = 1.0f ;
-        vertices[v_i+6] = v_1.x ;
-        vertices[v_i+7] = v_1.y ;
-        vertices[v_i+8] = v_1.z ;
-        vertices[v_i+9] = 1.0f ; vertices[v_i+10] = 1.0f ; vertices[v_i+11] = 1.0f ;
-        vertices[v_i+12] = v_2.x ;
-        vertices[v_i+13] = v_2.y ;
-        vertices[v_i+14] = v_2.z ;
-        vertices[v_i+15] = 1.0f ; vertices[v_i+16] = 1.0f ; vertices[v_i+17] = 1.0f ;
-        vertices[v_i+18] = v_3.x ;
-        vertices[v_i+19] = v_3.y ;
-        vertices[v_i+20] = v_3.z ;
-        vertices[v_i+21] = 1.0f ; vertices[v_i+22] = 1.0f ; vertices[v_i+23] = 1.0f ; v_i += num_vs ;
+        vtx_0.position = v_0 ;
+        vtx_0.color = V3 {1.0f, 1.0f, 1.0f} ;
+        sub(&v_1, &v_0, &e_0) ; //will reuse e_0 b/c shared by triangle 0,3,1
+        sub(&v_2, &v_0, &e_1) ;
+        cross(&e_0, &e_1, &n) ;
+        vtx_0.normal = n ;
+        vertices[v_i++] = vtx_0 ; //triangle 0,1,2
+        vtx_1.position = v_1 ;
+        vtx_1.color = V3 {1.0f, 1.0f, 1.0f} ;
+        vtx_1.normal = n ;
+        vertices[v_i++] = vtx_1 ;
+        vtx_2.position = v_2 ;
+        vtx_2.color = V3 {1.0f, 1.0f, 1.0f} ;
+        vtx_2.normal = n ;
+        vertices[v_i++] = vtx_2 ;
+        sub(&v_3, &v_0, &e_1) ;//triangle 0,1,3
+        cross(&e_1, &e_0, &n) ; //will reuse e_1 for triangle 0,2,3
+        vtx_0.normal = n ; //vertex 0
+        vertices[v_i++] = vtx_0 ;
+        vtx_3.normal = n ; //vertex 3
+        vertices[v_i++] = vtx_3 ;
+        vtx_1.normal = n ; //vertex 1
+        vertices[v_i++] = vtx_1 ;
+        sub(&v_2, &v_0, &e_0) ; //triangle 0,2,3
+        cross(&e_0, &e_1, &n) ;
+        vtx_0.normal = n ; //vertex 0
+        vertices[v_i++] = vtx_0 ;
+        vtx_2.normal = n ; //vertex 2
+        vertices[v_i++] = vtx_2 ;
+        vtx_3.normal = n ; //vertex 3
+        vertices[v_i++] = vtx_3 ;
+        sub(&v_3, &v_1, &e_0) ; //triangle 1,3,2
+        sub(&v_2, &v_1, &e_1) ;
+        cross(&e_0, &e_1, &n) ;
+        vtx_1.normal = n ; //vertex 1
+        vertices[v_i++] = vtx_1 ;
+        vtx_3.normal = n ; //vertex 3
+        vertices[v_i++] = vtx_3 ;
+        vtx_2.normal = n ; //vertex 2
+        vertices[v_i++] = vtx_2 ;
         debug_v3(&v_0, "v_0") ;
         debug_v3(&v_1, "v_1") ;
         debug_v3(&v_2, "v_2") ;
         debug_v3(&v_3, "v_3") ;
-    }
+    } ;
 }
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
     std::vector<Boid> boids ;
@@ -290,6 +308,9 @@ std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
         p = V3{(float) x, (float) y, (float) z} ;
         v = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
         a = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
+        p = V3{0.0f, 0.0f, 0.0f};
+        v = V3{1.0f, 0.0f, 0.0f};
+        a = V3{0.0f, 1.0f, 0.0f};
         boids.push_back(Boid {p, v, a}) ;
     }
     return boids ;
@@ -450,7 +471,7 @@ float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, 
     }
     return pts ;
 }
-float* gen_3d_grid(int* size, int* num_pts, int dim, int step) {
+float* gen_3d_grid(int* size, int* num_pts, int dim, int step) { //TODO gen only 1 dir then rotate 2x
     int vert_s = 3 ;
     *num_pts = 5292 ;//(2 * dim / step + 1) * 4 ;
     *size = *num_pts * vert_s * (int) sizeof(float) ;
