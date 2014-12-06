@@ -35,6 +35,7 @@ bool read_file(const char* f_name, char* str, int max_len);
 bool compile_shader(const char* f_name, GLuint shader) ;
 bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) ;
 float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) ;
+float* gen_3d_grid(int* size, int* num_pts, int dim, int step) ;
 
 
 int main() {
@@ -70,7 +71,7 @@ int main() {
     boids_s = 1 ; //for now
     elements_s = boids_s * boid_s * 3 ; //12
     vertices_s = boids_s * boid_s * vert_s ; //24
-    std::vector<Boid> boids = generate_boids(1, 1, 1, boids_s) ; //TODO use a C array instead because its more metal
+    std::vector<Boid> boids = generate_boids(10, 10, 10, boids_s) ; //TODO use a C array instead because its more metal
     debug_boid(&boids[0]) ;
     // ----------------------------- RESOURCES ----------------------------- //
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER) ; //Create, compile, link shader
@@ -97,12 +98,8 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
     //float vertices[vertices_s] ;
     //glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
-    float vertices[] = {
-            1.0f, 0.0f, 0.0f,   1.0f, 0.0f, 0.0f,
-           -1.0f, 0.0f, 1.0f,   0.0f, 1.0f, 0.0f,
-           -1.0f,-1.0f, 0.0f,   0.0f, 0.0f, 1.0f,
-           -1.0f, 1.0f, 0.0f,   1.0f, 1.0f, 1.0f,
-    } ;
+    float vertices[4*6] ;
+    render(boids, vertices, 4*6) ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW) ;
 
     // Create an element array
@@ -135,10 +132,10 @@ int main() {
     GLuint vbo_grid ; //grid vertex buffer object and vertex index object
     glGenBuffers(1, &vbo_grid) ;
     glBindBuffer(GL_ARRAY_BUFFER, vbo_grid) ;
-    float* grid_xz ;
     int grid_size, grid_num_pts ;
-    grid_xz = gen_2d_grid(&grid_size, &grid_num_pts, 100, 1, Y_AXIS, 0.0f) ;
-    glBufferData(GL_ARRAY_BUFFER, grid_size, grid_xz, GL_STATIC_DRAW) ;
+    float* grid_xyz = gen_2d_grid(&grid_size, &grid_num_pts, 10, 1, Y_AXIS, 0.0f) ;
+    //float* grid_xyz = gen_3d_grid(&grid_size, &grid_num_pts, 100, 10) ;
+    glBufferData(GL_ARRAY_BUFFER, grid_size, grid_xyz, GL_STATIC_DRAW) ;
 
     glEnableVertexAttribArray(pos_attr) ;
     glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;
@@ -194,7 +191,7 @@ int main() {
         glfwPollEvents() ;
     }
     // ---------------------------- CLEARING ------------------------------ //
-    free(grid_xz) ;
+    free(grid_xyz) ;
     glDeleteProgram(shader_prog) ;
     glDeleteShader(fragment_shader) ;
     glDeleteShader(vertex_shader) ;
@@ -239,9 +236,7 @@ void render(std::vector<Boid> boids, float* vertices, int num_vs) {
         b = boids[b_i] ;
         pos = b.pos ;
         t_0 = b.vel ;
-        normalize(&t_0) ;
         cross(&t_0, &b.acc, &t_1) ;
-        normalize(&t_1) ;
         cross(&t_0, &t_1, &t_2) ;
         add(&pos, &t_0, &v_0) ; //calculate bow vertex
         scale(-1.0f, &t_0) ; //calculate stern 3 vertices
@@ -249,6 +244,10 @@ void render(std::vector<Boid> boids, float* vertices, int num_vs) {
         add(&t_0, &t_2, &v_2) ; //down stern vertex 1
         scale(-1.0f, &t_2) ;
         add(&t_0, &t_2, &v_3) ; //down stern vertex 2
+        normalize(&v_0) ;
+        normalize(&v_1) ;
+        normalize(&v_2) ;
+        normalize(&v_3) ;
         vertices[v_i] = v_0.x ;
         vertices[v_i+1] = v_0.y ;
         vertices[v_i+2] = v_0.z ;
@@ -269,7 +268,6 @@ void render(std::vector<Boid> boids, float* vertices, int num_vs) {
         debug_v3(&v_1, "v_1") ;
         debug_v3(&v_2, "v_2") ;
         debug_v3(&v_3, "v_3") ;
-
     }
 }
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
@@ -283,15 +281,12 @@ std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
     int x, y, z ;
     V3 p, v, a ;
     for (int i = 0 ; i < number ; ++i) {
-        //x = r_x(generator) ;
-        //y = r_y(generator) ;
-        //z = r_z(generator) ;
-        //p = V3{(float) x, (float) y, (float) z} ;
-        //v = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
-        //a = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
-        p = V3{0.0f, 0.0f, 0.0f} ;
-        v = V3{1.0f, 0.0f, 0.0f} ;
-        a = V3{0.0f, 1.0f, 0.0f} ;
+        x = r_x(generator) ;
+        y = r_y(generator) ;
+        z = r_z(generator) ;
+        p = V3{(float) x, (float) y, (float) z} ;
+        v = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
+        a = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
         boids.push_back(Boid {p, v, a}) ;
     }
     return boids ;
@@ -449,6 +444,32 @@ float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, 
                 pts[i++] = fixed_at ;
             }
             break ;
+    }
+    return pts ;
+}
+float* gen_3d_grid(int* size, int* num_pts, int dim, int step) {
+    int vert_s = 3 ;
+    *num_pts = 5292 ;//(2 * dim / step + 1) * 4 ;
+    *size = *num_pts * vert_s * (int) sizeof(float) ;
+    float* pts = (float*) malloc((size_t)*size) ;
+    int i = 0 ;
+    for (int x = -dim; x <= dim; x += step) {
+        for (int y = -dim; y <= dim; y += step) {
+            pts[i++] = (float) x;
+            pts[i++] = (float) y;
+            pts[i++] = (float) -dim;
+            pts[i++] = (float) x;
+            pts[i++] = (float) y; //repeat for grid max
+            pts[i++] = (float) dim;
+        }
+        for (int z = -dim; z <= dim; z += step) { //now fix x
+            pts[i++] = (float) x;
+            pts[i++] = (float) -dim;
+            pts[i++] = (float) z;
+            pts[i++] = (float) x;
+            pts[i++] = (float) dim;
+            pts[i++] = (float) z;
+        }
     }
     return pts ;
 }
