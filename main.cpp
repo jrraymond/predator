@@ -14,7 +14,7 @@
 
 #define MAX_SHADER_SRC_SIZE 4096
 //TODO add lighting
-//TODO draw grid
+//TODO finish 3d grid using instancing
 enum Axis  { X_AXIS, Y_AXIS, Z_AXIS } ;
 struct Player {
     glm::vec3 pos ;
@@ -41,6 +41,7 @@ bool compile_shader(const char* f_name, GLuint shader) ;
 bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) ;
 float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) ;
 float* gen_3d_grid(int* size, int* num_pts, int dim, int step) ;
+float* gen_boid_normals(Vtx* vertices, int num_vertices, int* num_pts) ;
 
 
 int main() {
@@ -85,26 +86,25 @@ int main() {
     GLuint shader_prog = glCreateProgram() ;
     link_shader(shader_prog, {vertex_shader, fragment_shader}) ;
     glUseProgram(shader_prog) ;
-    GLint pos_attr = glGetAttribLocation(shader_prog, "position") ;
+    GLint pos_attr = glGetAttribLocation(shader_prog, "pos_model") ;
     GLint col_attr = glGetAttribLocation(shader_prog, "color_in") ;
-    GLint nor_attr = glGetAttribLocation(shader_prog, "normal") ;
+    GLint nor_attr = glGetAttribLocation(shader_prog, "normal_model") ;
 
-    // Create Vertex Array Object
+    // Create Vertex Array Objects
     GLuint vao_boids ; //boids
     glGenVertexArrays(1, &vao_boids) ;
-
     GLuint vao_grid ; //grid
     glGenVertexArrays(1, &vao_grid) ;
+    GLuint vao_normals ; //normals
+    glGenVertexArrays(1, &vao_normals) ;
 
     glBindVertexArray(vao_boids) ;
-    // Create a Vertex Buffer Object and copy the vertex data to it
-    GLuint vbo_boids ;
+    GLuint vbo_boids ; // Create a Vertex Buffer Object and copy the vertex data to it
     glGenBuffers(1, &vbo_boids) ; //creates buffer object
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
-    //float vertices[vertices_s] ;
-    //glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
-    Vtx vertices[3*4*sizeof(Vtx)] ;
-    render(boids, vertices, 4*6) ;
+    int num_boid_vertices = 12 ;
+    Vtx vertices[num_boid_vertices] ;
+    render(boids, vertices, num_boid_vertices) ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW) ;
 
     glEnableVertexAttribArray(pos_attr) ;
@@ -123,10 +123,21 @@ int main() {
     float* grid_xyz = gen_2d_grid(&grid_size, &grid_num_pts, 10, 1, Y_AXIS, 0.0f) ;
     //float* grid_xyz = gen_3d_grid(&grid_size, &grid_num_pts, 10, 1) ;
     glBufferData(GL_ARRAY_BUFFER, grid_size, grid_xyz, GL_STATIC_DRAW) ;
-
     glEnableVertexAttribArray(pos_attr) ;
     glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;
     glVertexAttrib3f(col_attr, 1.0f, 0.0f, 0.0f) ;
+
+    glBindVertexArray(vao_normals) ;
+    GLuint vbo_normals ;
+    glGenBuffers(1, &vbo_normals) ;
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_normals) ;
+    int boid_normals_size ;
+    int num_normal_pts = 2 * num_boid_vertices ;
+    float* boid_normals = gen_boid_normals(vertices, num_boid_vertices, &boid_normals_size) ;
+    glBufferData(GL_ARRAY_BUFFER, boid_normals_size, boid_normals, GL_STATIC_DRAW) ;
+    glEnableVertexAttribArray(pos_attr) ;
+    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_TRUE, 0, (void*) 0) ;
+    glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
 
     glm::mat4 model = glm::mat4() ;
     glm::mat4 view = glm::lookAt(
@@ -162,10 +173,6 @@ int main() {
         lastTime = thisTime ;
         thisTime = glfwGetTime() ;
         deltaTime = thisTime - lastTime ;
-        //GLint uni_color = glGetUniformLocation(shader_prog, "vertex_color") ;
-        //float time = (float) glfwGetTime() ;
-        //float adj_factor = sin(time) - 0.5f ;
-        //glUniform3f(uni_color, adj_factor, adj_factor, adj_factor) ;
 
         handle_input(window, &player1, deltaTime, &view) ;
         glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view)) ;
@@ -176,11 +183,17 @@ int main() {
 
         glBindVertexArray(vao_boids) ;
         //render(boids, vertices, boid_s * vert_s) ;
-        glDrawElements(GL_TRIANGLES, elements_s, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
+        //glDrawElements(GL_TRIANGLES, elements_s, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
         glDrawArrays(GL_TRIANGLES, 0, boids_s * boid_s) ;
 
         glBindVertexArray(vao_grid) ;
+        glVertexAttrib3f(col_attr, 1.0f, 0.0f, 0.0f) ;
         glDrawArrays(GL_LINES, 0, grid_num_pts) ;
+
+        glBindVertexArray(vao_normals) ;
+        glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
+        glDrawArrays(GL_LINES, 0, num_normal_pts) ;
+
 
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
@@ -220,7 +233,7 @@ void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) 
     glm::vec3 up = glm::cross(right, dir) ;
     *view_ptr = glm::lookAt(p->pos, p->pos + dir, up) ;
 }
-
+// TODO instancing
 void render(std::vector<Boid> boids, Vtx* vertices, int num_vs) {
     int s = (int) boids.size() ;
     Vtx vtx_0, vtx_1, vtx_2, vtx_3 ; //4 vertices per triangle
@@ -236,34 +249,34 @@ void render(std::vector<Boid> boids, Vtx* vertices, int num_vs) {
         cross(&t_0, &b.acc, &t_1) ;
         cross(&t_0, &t_1, &t_2) ;
         add(&pos, &t_0, &v_0) ; //calculate bow vertex
+        scale(2.0f, &v_0) ;
         scale(-1.0f, &t_0) ; //calculate stern 3 vertices
+        add(&pos, &t_0, &t_0) ;
         add(&t_0, &t_1, &v_1) ; //up stern vertex
         add(&t_0, &t_2, &v_2) ; //down stern vertex 1
         scale(-1.0f, &t_2) ;
         add(&t_0, &t_2, &v_3) ; //down stern vertex 2
-        normalize(&v_0) ;
-        normalize(&v_1) ;
-        normalize(&v_2) ;
-        normalize(&v_3) ;
         vtx_0.position = v_0 ;
-        vtx_0.color = V3 {1.0f, 1.0f, 1.0f} ;
+        vtx_0.color = V3 {0.0f, 1.0f, 0.0f} ;
         sub(&v_1, &v_0, &e_0) ; //will reuse e_0 b/c shared by triangle 0,3,1
         sub(&v_2, &v_0, &e_1) ;
         cross(&e_0, &e_1, &n) ;
         vtx_0.normal = n ;
         vertices[v_i++] = vtx_0 ; //triangle 0,1,2
         vtx_1.position = v_1 ;
-        vtx_1.color = V3 {1.0f, 1.0f, 1.0f} ;
+        vtx_1.color = V3 { 0.0f, 1.0f, 0.0f } ;
         vtx_1.normal = n ;
         vertices[v_i++] = vtx_1 ;
         vtx_2.position = v_2 ;
-        vtx_2.color = V3 {1.0f, 1.0f, 1.0f} ;
+        vtx_2.color = V3 { 0.0f, 0.0f, 1.0f } ;
         vtx_2.normal = n ;
         vertices[v_i++] = vtx_2 ;
         sub(&v_3, &v_0, &e_1) ;//triangle 0,1,3
         cross(&e_1, &e_0, &n) ; //will reuse e_1 for triangle 0,2,3
         vtx_0.normal = n ; //vertex 0
         vertices[v_i++] = vtx_0 ;
+        vtx_3.position = v_3 ;
+        vtx_3.color = V3 {0.0f, 0.0f, 1.0f } ;
         vtx_3.normal = n ; //vertex 3
         vertices[v_i++] = vtx_3 ;
         vtx_1.normal = n ; //vertex 1
@@ -496,4 +509,24 @@ float* gen_3d_grid(int* size, int* num_pts, int dim, int step) { //TODO gen only
         }
     }
     return pts ;
+}
+void debug_vtx(Vtx* v) {
+    std::cout << "Vtx (" << v->position.x << "," << v->position.y << "," << v->position.z << ")\t" ;
+}
+float* gen_boid_normals(Vtx *vertices, int num_vertices, int* size) {
+    *size = num_vertices * 3 * 2 * (int) sizeof(float) ;
+    float* boid_normals = (float*) malloc((size_t)*size) ;
+    V3 p_0, p_1 ;
+    int j = 0 ;
+    for (int i=0; i<num_vertices; ++i) {
+        p_0 = vertices[i].position ;
+        add(&vertices[i].normal, &p_0, &p_1) ;
+        boid_normals[j] = p_0.x ; ++j ;
+        boid_normals[j] = p_0.y ; ++j ;
+        boid_normals[j] = p_0.z ; ++j ;
+        boid_normals[j] = p_1.x ; ++j ;
+        boid_normals[j] = p_1.y ; ++j ;
+        boid_normals[j] = p_1.z ; ++j ;
+    }
+    return boid_normals ;
 }
