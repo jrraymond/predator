@@ -83,7 +83,7 @@ int main() {
     glUseProgram(shader_prog) ;
     GLint pos_attr = glGetAttribLocation(shader_prog, "position") ;
     GLint col_attr = glGetAttribLocation(shader_prog, "color_in") ;
-    
+
     // Create Vertex Array Object
     GLuint vao_boids ; //boids
     glGenVertexArrays(1, &vao_boids) ;
@@ -154,7 +154,10 @@ int main() {
     GLint uni_proj = glGetUniformLocation(shader_prog, "proj") ;
     glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(uni_proj, 1, GL_FALSE, glm::value_ptr(proj));
-    //depth
+    GLint uni_amb = glGetUniformLocation(shader_prog, "ambient") ;
+    glm::vec3 ambient_light (0.5f, 0.5f, 0.5f) ;
+    glUniform3fv(uni_amb, 1, &ambient_light[0]) ;
+
     glEnable(GL_DEPTH_TEST) ;
 
     // ------------------------ Handling Input ----------------------------- //
