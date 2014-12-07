@@ -11,6 +11,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <unistd.h>
 
 #define MAX_SHADER_SRC_SIZE 4096
 //TODO finish 3d grid using instancing
@@ -31,7 +32,7 @@ struct Vtx {
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
 void draw_boid(Boid*) ;
 void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
-void render(std::vector<Boid>, Vtx * vertices, int boid_s) ;
+void render(std::vector<Boid> &boids, Vtx* vertices, int boid_s) ;
 bool shader_is_valid(GLuint sp) ;
 void print_shader_link_info(GLuint sp) ;
 void print_shader_comp_info(GLuint shader_index) ;
@@ -41,6 +42,8 @@ bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) ;
 float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) ;
 float* gen_3d_grid(int* size, int* num_pts, int dim, int step) ;
 float* gen_boid_normals(Vtx* vertices, int num_vertices, int* num_pts) ;
+void debug_vtx(Vtx v);
+void debug_vertices(Vtx* vs, int size);
 
 
 int main() {
@@ -76,7 +79,6 @@ int main() {
     boids_s = 1 ; //for now
     vertices_s = boids_s * boid_s * vert_s ; //24
     std::vector<Boid> boids = generate_boids(10, 10, 10, boids_s) ; //TODO use a C array instead because its more metal
-    debug_boid(&boids[0]) ;
     // ----------------------------- RESOURCES ----------------------------- //
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER) ; //Create, compile, link shader
     compile_shader("vertex_shader.glsl", vertex_shader) ;
@@ -94,8 +96,8 @@ int main() {
     glGenVertexArrays(1, &vao_boids) ;
     GLuint vao_grid ; //grid
     glGenVertexArrays(1, &vao_grid) ;
-    GLuint vao_normals ; //normals
-    glGenVertexArrays(1, &vao_normals) ;
+    //GLuint vao_normals ; //normals
+    //glGenVertexArrays(1, &vao_normals) ;
 
     glBindVertexArray(vao_boids) ;
     GLuint vbo_boids ; // Create a Vertex Buffer Object and copy the vertex data to it
@@ -126,17 +128,17 @@ int main() {
     glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;
     glVertexAttrib3f(col_attr, 1.0f, 0.0f, 0.0f) ;
 
-    glBindVertexArray(vao_normals) ;
-    GLuint vbo_normals ;
-    glGenBuffers(1, &vbo_normals) ;
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_normals) ;
-    int boid_normals_size ;
-    int num_normal_pts = 2 * num_boid_vertices ;
-    float* boid_normals = gen_boid_normals(vertices, num_boid_vertices, &boid_normals_size) ;
-    glBufferData(GL_ARRAY_BUFFER, boid_normals_size, boid_normals, GL_STATIC_DRAW) ;
-    glEnableVertexAttribArray(pos_attr) ;
-    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;
-    glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
+    //glBindVertexArray(vao_normals) ;
+    //GLuint vbo_normals ;
+    //glGenBuffers(1, &vbo_normals) ;
+    //glBindBuffer(GL_ARRAY_BUFFER, vbo_normals) ;
+    //int boid_normals_size ;
+    //int num_normal_pts = 2 * num_boid_vertices ;
+    //float* boid_normals = gen_boid_normals(vertices, num_boid_vertices, &boid_normals_size) ;
+    //glBufferData(GL_ARRAY_BUFFER, boid_normals_size, boid_normals, GL_STATIC_DRAW) ;
+    //glEnableVertexAttribArray(pos_attr) ;
+    //glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;
+    //glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
 
     glm::mat4 model = glm::mat4() ;
     glm::mat4 view = glm::lookAt(
@@ -160,7 +162,6 @@ int main() {
     GLint uni_spec = glGetUniformLocation(shader_prog, "spec_coefficient") ;
     GLfloat specular_coefficient = 10.0f ;
     glUniform1f(uni_spec, specular_coefficient) ;
-    //TODO add specular lighting
 
     glEnable(GL_DEPTH_TEST) ;
 
@@ -180,13 +181,16 @@ int main() {
         glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view)) ;
         glUniformMatrix4fv(uni_model, 1, GL_FALSE, glm::value_ptr(model));
 
-        update_flock(boids) ;
-        render(boids, vertices, num_boid_vertices) ;
-
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f) ; // Clear the screen to black
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) ;
 
         glBindVertexArray(vao_boids) ;
+        //update_flock(boids) ;
+        orbit(boids, V3 {1, 0, 0}, 0.05f) ;
+        render(boids, vertices, num_boid_vertices) ;
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
+
         //render(boids, vertices, boid_s * vert_s) ;
         //glDrawElements(GL_TRIANGLES, elements_s, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
         glDrawArrays(GL_TRIANGLES, 0, boids_s * boid_s) ;
@@ -195,12 +199,13 @@ int main() {
         glVertexAttrib3f(col_attr, 1.0f, 0.0f, 0.0f) ;
         glDrawArrays(GL_LINES, 0, grid_num_pts) ;
 
-        glBindVertexArray(vao_normals) ;
-        glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
-        glDrawArrays(GL_LINES, 0, num_normal_pts) ;
+        //glBindVertexArray(vao_normals) ;
+        //glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
+        //glDrawArrays(GL_LINES, 0, num_normal_pts) ;
 
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
+        sleep(0.1) ;
     }
     // ---------------------------- CLEARING ------------------------------ //
     free(grid_xyz) ;
@@ -209,10 +214,10 @@ int main() {
     glDeleteShader(vertex_shader) ;
     glDeleteBuffers(1, &vbo_boids) ;
     glDeleteBuffers(1, &vbo_grid) ;
-    glDeleteBuffers(1, &vbo_normals) ;
+    //glDeleteBuffers(1, &vbo_normals) ;
     glDeleteVertexArrays(1, &vao_boids) ;
     glDeleteVertexArrays(1, &vao_grid) ;
-    glDeleteVertexArrays(1, &vao_normals) ;
+    //glDeleteVertexArrays(1, &vao_normals) ;
 
     // ---------------------------- TERMINATE ----------------------------- //
     glfwTerminate() ;
@@ -240,7 +245,7 @@ void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) 
     *view_ptr = glm::lookAt(p->pos, p->pos + dir, up) ;
 }
 // TODO instancing
-void render(std::vector<Boid> boids, Vtx* vertices, int num_vs) {
+void render(std::vector<Boid> &boids, Vtx* vertices, int num_vs) {
     int s = (int) boids.size() ;
     Vtx vtx_0, vtx_1, vtx_2, vtx_3 ; //4 vertices per triangle
     Boid b ;
@@ -255,6 +260,7 @@ void render(std::vector<Boid> boids, Vtx* vertices, int num_vs) {
         cross(&t_0, &b.acc, &t_1) ;
         cross(&t_0, &t_1, &t_2) ;
         add(&pos, &t_0, &v_0) ; //calculate bow vertex
+        normalize(&v_0) ;
         scale(2.0f, &v_0) ;
         scale(-1.0f, &t_0) ; //calculate stern 3 vertices
         add(&pos, &t_0, &t_0) ;
@@ -304,6 +310,10 @@ void render(std::vector<Boid> boids, Vtx* vertices, int num_vs) {
         vertices[v_i++] = vtx_3 ;
         vtx_2.normal = n ; //vertex 2
         vertices[v_i++] = vtx_2 ;
+        //debug_vtx(&vtx_0) ;
+        //debug_vtx(&vtx_1) ;
+        //debug_vtx(&vtx_2) ;
+        //debug_vtx(&vtx_3) ;
     } ;
 }
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
@@ -323,15 +333,13 @@ std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
         p = V3{(float) x, (float) y, (float) z} ;
         v = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
         a = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
-        p = V3{0.0f, 0.0f, 0.0f};
+        p = V3{1.0f, 0.0f, 1.0f};
         v = V3{1.0f, 0.0f, 0.0f};
         a = V3{0.0f, 1.0f, 0.0f};
         boids.push_back(Boid {p, v, a}) ;
     }
     return boids ;
 }
-
-
 void print_shader_comp_info(GLuint shader_index) {
     int max_length = 2048;
     int actual_length = 0;
@@ -357,8 +365,6 @@ bool shader_is_valid(GLuint sp) {
     }
     return true;
 }
-
-
 bool read_file(const char* f_name, char* str, int max_len) {
     FILE* fp = fopen(f_name , "r") ;
     int len = 0 ;
@@ -420,8 +426,6 @@ bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) {
     }
     return true ;
 }
-
-
 float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) {
     int vert_s = 3 ;
     *num_pts = (2 * dim / step + 1) * 4 ;
@@ -512,8 +516,10 @@ float* gen_3d_grid(int* size, int* num_pts, int dim, int step) { //TODO gen only
     }
     return pts ;
 }
-void debug_vtx(Vtx* v) {
-    std::cout << "Vtx (" << v->position.x << "," << v->position.y << "," << v->position.z << ")\t" ;
+void debug_vtx(Vtx v) {
+    std::cout << "|p(" << v.position.x << "," << v.position.y << "," << v.position.z << ")" ;
+    std::cout << "|c(" << v.color.x << "," << v.color.y << "," << v.color.z << ")" ;
+    std::cout << "|n(" << v.normal.x << "," << v.normal.y << "," << v.normal.z << ")" ;
 }
 float* gen_boid_normals(Vtx *vertices, int num_vertices, int* size) {
     *size = num_vertices * 3 * 2 * (int) sizeof(float) ;
@@ -534,4 +540,13 @@ float* gen_boid_normals(Vtx *vertices, int num_vertices, int* size) {
         boid_normals[j] = p_1.z ; ++j ;
     }
     return boid_normals ;
+}
+
+
+void debug_vertices(Vtx* vs, int size) {
+    std::cout << "Vertices|\n\t" ;
+    for(int i=0; i<size; ++i) {
+        debug_vtx(vs[i]) ;
+    }
+    std::cout << std::endl ;
 }

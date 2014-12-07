@@ -66,8 +66,22 @@ V3 centroid(std::vector<Boid> bs) {
         y += tmp.y ;
         z += tmp.z ;
     }
+
     return V3{x / s, y / s, z / s} ;
 }
 void debug_boid(Boid* b) {
     std::cout << "Boid: p[" << b->pos.x << "," << b->pos.y << "," << b->pos.z << "]" << std::endl ;
+}
+void orbit(std::vector<Boid> &bs, V3 v, float angle) {
+    V3 p;
+    V3 p_new ;
+    float cos_a = (float) cos(angle) ;
+    float sin_a = (float) sin(angle) ;
+    for (int i=0; i < bs.size() ; ++i) {
+        p = bs[i].pos ;
+        p_new.x = cos_a * p.x - sin_a * p.y + v.x * p.z ;
+        p_new.y = sin_a * p.x + cos_a * p.y + v.y * p.z ;
+        p_new.z = v.z * p.z ;
+        bs[i].pos = p_new ;
+    }
 }

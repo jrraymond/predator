@@ -16,5 +16,6 @@ void cohesion(float x, const Boid* b, const std::vector<Boid> bs, V3* coh) ;
 void align(float x, const std::vector<Boid> bs, V3* ali) ;
 V3 centroid(std::vector<Boid> bs) ;
 void debug_boid(Boid* b) ;
+void orbit(std::vector<Boid> &bs, V3 v, float angle) ;
 
 #endif
