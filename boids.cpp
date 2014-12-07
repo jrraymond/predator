@@ -4,9 +4,9 @@
 
 void update_flock(std::vector<Boid> bs) {
     unsigned long sz = bs.size() ;
-    std::vector<Boid> old_bs = bs ;
+    std::vector<Boid> old_bs(bs) ;
     for (int i = 0; i < sz; ++i) {
-        Boid new_b = Boid(old_bs[i]) ;
+        Boid new_b(old_bs[i]) ;
         update_boid(&new_b, old_bs) ;
         bs[i] = new_b ;
     }

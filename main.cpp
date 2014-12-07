@@ -13,7 +13,6 @@
 #include <glm/gtx/string_cast.hpp>
 
 #define MAX_SHADER_SRC_SIZE 4096
-//TODO add lighting
 //TODO finish 3d grid using instancing
 enum Axis  { X_AXIS, Y_AXIS, Z_AXIS } ;
 struct Player {
@@ -33,10 +32,10 @@ std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
 void draw_boid(Boid*) ;
 void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
 void render(std::vector<Boid>, Vtx * vertices, int boid_s) ;
-bool shader_is_valid(GLuint sp);
-void print_shader_link_info(GLuint sp);
-void print_shader_comp_info(GLuint shader_index);
-bool read_file(const char* f_name, char* str, int max_len);
+bool shader_is_valid(GLuint sp) ;
+void print_shader_link_info(GLuint sp) ;
+void print_shader_comp_info(GLuint shader_index) ;
+bool read_file(const char* f_name, char* str, int max_len) ;
 bool compile_shader(const char* f_name, GLuint shader) ;
 bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) ;
 float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) ;
@@ -105,7 +104,7 @@ int main() {
     int num_boid_vertices = 12 ;
     Vtx vertices[num_boid_vertices] ;
     render(boids, vertices, num_boid_vertices) ;
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW) ;
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
 
     glEnableVertexAttribArray(pos_attr) ;
     glEnableVertexAttribArray(col_attr) ;
@@ -136,7 +135,7 @@ int main() {
     float* boid_normals = gen_boid_normals(vertices, num_boid_vertices, &boid_normals_size) ;
     glBufferData(GL_ARRAY_BUFFER, boid_normals_size, boid_normals, GL_STATIC_DRAW) ;
     glEnableVertexAttribArray(pos_attr) ;
-    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_TRUE, 0, (void*) 0) ;
+    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;
     glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
 
     glm::mat4 model = glm::mat4() ;
@@ -153,12 +152,15 @@ int main() {
     glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(uni_proj, 1, GL_FALSE, glm::value_ptr(proj));
     GLint uni_amb = glGetUniformLocation(shader_prog, "ambient") ;
-    glm::vec3 ambient_light (0.5f, 0.5f, 0.5f) ;
+    glm::vec3 ambient_light (0.1f, 0.1f, 0.1f) ;
     glUniform3fv(uni_amb, 1, &ambient_light[0]) ;
-    GLint uni_light = glGetUniformLocation(shader_prog, "light") ;
-    glm::vec3 light_pos (player1.pos.x, player1.pos.y, player1.pos.z) ;
+    GLint uni_light = glGetUniformLocation(shader_prog, "light_model") ;
+    glm::vec3 light_pos (0.0f, 5.0f, 0.0f) ;
     glUniform3fv(uni_light, 1, &light_pos[0]) ;
-    //TODO add diffuse and specular lighting
+    GLint uni_spec = glGetUniformLocation(shader_prog, "spec_coefficient") ;
+    GLfloat specular_coefficient = 10.0f ;
+    glUniform1f(uni_spec, specular_coefficient) ;
+    //TODO add specular lighting
 
     glEnable(GL_DEPTH_TEST) ;
 
@@ -178,6 +180,9 @@ int main() {
         glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view)) ;
         glUniformMatrix4fv(uni_model, 1, GL_FALSE, glm::value_ptr(model));
 
+        update_flock(boids) ;
+        render(boids, vertices, num_boid_vertices) ;
+
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f) ; // Clear the screen to black
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) ;
 
@@ -194,7 +199,6 @@ int main() {
         glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
         glDrawArrays(GL_LINES, 0, num_normal_pts) ;
 
-
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
     }
@@ -205,8 +209,10 @@ int main() {
     glDeleteShader(vertex_shader) ;
     glDeleteBuffers(1, &vbo_boids) ;
     glDeleteBuffers(1, &vbo_grid) ;
+    glDeleteBuffers(1, &vbo_normals) ;
     glDeleteVertexArrays(1, &vao_boids) ;
     glDeleteVertexArrays(1, &vao_grid) ;
+    glDeleteVertexArrays(1, &vao_normals) ;
 
     // ---------------------------- TERMINATE ----------------------------- //
     glfwTerminate() ;
@@ -298,10 +304,6 @@ void render(std::vector<Boid> boids, Vtx* vertices, int num_vs) {
         vertices[v_i++] = vtx_3 ;
         vtx_2.normal = n ; //vertex 2
         vertices[v_i++] = vtx_2 ;
-        debug_v3(&v_0, "v_0") ;
-        debug_v3(&v_1, "v_1") ;
-        debug_v3(&v_2, "v_2") ;
-        debug_v3(&v_3, "v_3") ;
     } ;
 }
 std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
@@ -517,10 +519,13 @@ float* gen_boid_normals(Vtx *vertices, int num_vertices, int* size) {
     *size = num_vertices * 3 * 2 * (int) sizeof(float) ;
     float* boid_normals = (float*) malloc((size_t)*size) ;
     V3 p_0, p_1 ;
+    V3 n ;
     int j = 0 ;
     for (int i=0; i<num_vertices; ++i) {
         p_0 = vertices[i].position ;
-        add(&vertices[i].normal, &p_0, &p_1) ;
+        n = vertices[i].normal ;
+        normalize(&n) ;
+        add(&n, &p_0, &p_1) ;
         boid_normals[j] = p_0.x ; ++j ;
         boid_normals[j] = p_0.y ; ++j ;
         boid_normals[j] = p_0.z ; ++j ;
