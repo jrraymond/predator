@@ -12,8 +12,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <unistd.h>
+#include "shader_utils.h"
 
-#define MAX_SHADER_SRC_SIZE 4096
 //TODO finish 3d grid using instancing
 enum Axis  { X_AXIS, Y_AXIS, Z_AXIS } ;
 struct Player {
@@ -33,12 +33,6 @@ std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
 void draw_boid(Boid*) ;
 void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
 void render(std::vector<Boid> &boids, Vtx* vertices, int boid_s) ;
-bool shader_is_valid(GLuint sp) ;
-void print_shader_link_info(GLuint sp) ;
-void print_shader_comp_info(GLuint shader_index) ;
-bool read_file(const char* f_name, char* str, int max_len) ;
-bool compile_shader(const char* f_name, GLuint shader) ;
-bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) ;
 float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) ;
 float* gen_3d_grid(int* size, int* num_pts, int dim, int step) ;
 float* gen_boid_normals(Vtx* vertices, int num_vertices, int* num_pts) ;
@@ -341,92 +335,6 @@ std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
         boids.push_back(Boid {p, v, a}) ;
     }
     return boids ;
-}
-void print_shader_comp_info(GLuint shader_index) {
-    int max_length = 2048;
-    int actual_length = 0;
-    char log[2048];
-    glGetShaderInfoLog (shader_index, max_length, &actual_length, log);
-    printf ("shader info log for GL index %i:\n%s\n", shader_index, log);
-}
-void print_shader_link_info(GLuint sp) {
-    int max_length = 2048;
-    int actual_length = 0;
-    char log[2048];
-    glGetProgramInfoLog (sp, max_length, &actual_length, log);
-    printf ("program info log for GL index %i:\n%s", sp, log);
-}
-bool shader_is_valid(GLuint sp) {
-    int params = -1;
-    glValidateProgram (sp);
-    glGetProgramiv (sp, GL_VALIDATE_STATUS, &params);
-    printf ("program %i GL_VALIDATE_STATUS = %i\n", sp, params);
-    if (GL_TRUE != params) {
-        print_shader_link_info(sp);
-        return false;
-    }
-    return true;
-}
-bool read_file(const char* f_name, char* str, int max_len) {
-    FILE* fp = fopen(f_name , "r") ;
-    int len = 0 ;
-    char line[80] ;
-
-    str[0] = '\0' ;
-    if (fp == NULL) {
-        fprintf(stderr, "ERROR: error opening file: %s\n", f_name) ;
-        return false ;
-    }
-    strcpy(line, "") ;
-    while (!feof(fp)) {
-        if (NULL != fgets(line, 80, fp)) {
-            len += strlen(line) ;
-            if (len >= max_len) {
-                fprintf(stderr, "ERROR: file length greater than max length: %i", max_len ) ;
-            }
-            strcat(str, line) ;
-        }
-    }
-    if (fclose(fp) == EOF) {
-        fprintf(stderr, "ERROR: closing file %s\n", f_name) ;
-        return false ;
-    }
-    return true ;
-}
-/* compiles a shader given file name containing source and shader index */
-bool compile_shader(const char* f_name, GLuint shader) {
-    GLint status ;
-    char src[MAX_SHADER_SRC_SIZE] ;
-    if (!read_file(f_name, src, MAX_SHADER_SRC_SIZE)) {  return false ;  }
-    const GLchar* glsrc = (const GLchar*) src ;
-    glShaderSource(shader, 1, &glsrc, NULL) ;
-    glCompileShader(shader) ;
-    //check for compilation errors
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &status) ;
-    if (GL_TRUE != status) {
-        fprintf(stderr, "ERROR: GL shader %s index %i did not compile\n", f_name, shader) ;
-        print_shader_comp_info(shader) ;
-        return false ;
-    }
-    return true ;
-}
-bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) {
-    GLint status ;
-    for(auto x : shaders) {
-        glAttachShader(prog, x) ;
-    }
-    glLinkProgram(prog) ;
-    glGetProgramiv(prog, GL_LINK_STATUS, &status) ;
-    if (GL_TRUE != status) {
-        fprintf(
-                stderr,
-                "ERROR: could not link shader programme GL index %i\n",
-                prog
-        );
-        print_shader_link_info(prog) ;
-        return false ;
-    }
-    return true ;
 }
 float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) {
     int vert_s = 3 ;
