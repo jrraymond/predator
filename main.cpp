@@ -76,7 +76,7 @@ int main() {
     int boids_s, boid_s, vert_s, vertices_s, elements_s ;
     vert_s = sizeof(Vtx) ; //for now just position and color info
     boid_s = 12 ; // 12 vertices per boid (4 triangles by 3 verteces)
-    boids_s = 1 ; //for now
+    boids_s = 10 ; //for now
     vertices_s = boids_s * boid_s * vert_s ; //24
     std::vector<Boid> boids = generate_boids(10, 10, 10, boids_s) ; //TODO use a C array instead because its more metal
     // ----------------------------- RESOURCES ----------------------------- //
@@ -103,7 +103,7 @@ int main() {
     GLuint vbo_boids ; // Create a Vertex Buffer Object and copy the vertex data to it
     glGenBuffers(1, &vbo_boids) ; //creates buffer object
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
-    int num_boid_vertices = 12 ;
+    int num_boid_vertices = boid_s * boids_s ;
     Vtx vertices[num_boid_vertices] ;
     render(boids, vertices, num_boid_vertices) ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
@@ -120,9 +120,9 @@ int main() {
     GLuint vbo_grid ; //grid vertex buffer object and vertex index object
     glGenBuffers(1, &vbo_grid) ;
     glBindBuffer(GL_ARRAY_BUFFER, vbo_grid) ;
-    int grid_size, grid_num_pts ;
-    float* grid_xyz = gen_2d_grid(&grid_size, &grid_num_pts, 10, 1, Y_AXIS, 0.0f) ;
-    //float* grid_xyz = gen_3d_grid(&grid_size, &grid_num_pts, 10, 1) ;
+    int grid_size, num_grid_pts;
+    float* grid_xyz = gen_2d_grid(&grid_size, &num_grid_pts, 10, 1, Y_AXIS, 0.0f) ;
+    //float* grid_xyz = gen_3d_grid(&grid_size, &num_grid_pts, 10, 1) ;
     glBufferData(GL_ARRAY_BUFFER, grid_size, grid_xyz, GL_STATIC_DRAW) ;
     glEnableVertexAttribArray(pos_attr) ;
     glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;
@@ -186,18 +186,18 @@ int main() {
 
         glBindVertexArray(vao_boids) ;
         //update_flock(boids) ;
-        orbit(boids, V3 {1, 0, 0}, 0.05f) ;
-        render(boids, vertices, num_boid_vertices) ;
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
+        //orbit(boids, V3 {1, 0, 0}, 0.05f) ;
+        //render(boids, vertices, num_boid_vertices) ;
+        //glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
+        //glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
 
         //render(boids, vertices, boid_s * vert_s) ;
         //glDrawElements(GL_TRIANGLES, elements_s, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
-        glDrawArrays(GL_TRIANGLES, 0, boids_s * boid_s) ;
+        glDrawArrays(GL_TRIANGLES, 0, num_boid_vertices) ;
 
         glBindVertexArray(vao_grid) ;
         glVertexAttrib3f(col_attr, 1.0f, 0.0f, 0.0f) ;
-        glDrawArrays(GL_LINES, 0, grid_num_pts) ;
+        glDrawArrays(GL_LINES, 0, num_grid_pts) ;
 
         //glBindVertexArray(vao_normals) ;
         //glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
@@ -258,16 +258,18 @@ void render(std::vector<Boid> &boids, Vtx* vertices, int num_vs) {
         pos = b.pos ;
         t_0 = b.vel ;
         cross(&t_0, &b.acc, &t_1) ;
-        cross(&t_0, &t_1, &t_2) ;
+        cross(&t_1, &t_0, &t_2) ;
+        normalize(&t_0) ;
+        scale(2.0f, &t_0) ;
         add(&pos, &t_0, &v_0) ; //calculate bow vertex
-        normalize(&v_0) ;
-        scale(2.0f, &v_0) ;
-        scale(-1.0f, &t_0) ; //calculate stern 3 vertices
+        scale(-0.5f, &t_0) ; //calculate stern 3 vertices
         add(&pos, &t_0, &t_0) ;
-        add(&t_0, &t_1, &v_1) ; //up stern vertex
-        add(&t_0, &t_2, &v_2) ; //down stern vertex 1
-        scale(-1.0f, &t_2) ;
-        add(&t_0, &t_2, &v_3) ; //down stern vertex 2
+        normalize(&t_2) ;
+        add(&t_0, &t_2, &v_1) ; //up stern vertex
+        normalize(&t_1) ;
+        add(&t_0, &t_1, &v_2) ; //down stern vertex 1
+        scale(-1.0f, &t_1) ;
+        add(&t_0, &t_1, &v_3) ; //down stern vertex 2
         vtx_0.position = v_0 ;
         vtx_0.color = V3 {0.0f, 1.0f, 0.0f} ;
         sub(&v_1, &v_0, &e_0) ; //will reuse e_0 b/c shared by triangle 0,3,1
@@ -321,21 +323,21 @@ std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
     boids.reserve(number) ;
     std::random_device                  rand_dev ;
     std::mt19937                        generator(rand_dev()) ;
-    std::uniform_int_distribution<int>  r_x(0, max_x) ;
-    std::uniform_int_distribution<int>  r_y(0, max_y) ;
-    std::uniform_int_distribution<int>  r_z(0, max_z) ;
+    std::uniform_int_distribution<int>  r_x(-max_x, max_x) ;
+    std::uniform_int_distribution<int>  r_y(-max_y, max_y) ;
+    std::uniform_int_distribution<int>  r_z(-max_z, max_z) ;
     int x, y, z ;
     V3 p, v, a ;
     for (int i = 0 ; i < number ; ++i) {
-        x = r_x(generator) ;
-        y = r_y(generator) ;
-        z = r_z(generator) ;
+        x = r_x(generator) ; y = r_y(generator) ; z = r_z(generator) ;
         p = V3{(float) x, (float) y, (float) z} ;
-        v = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
-        a = V3{(float) rand() / RAND_MAX, (float) rand() / RAND_MAX, (float) rand() / RAND_MAX} ;
-        p = V3{1.0f, 0.0f, 1.0f};
-        v = V3{1.0f, 0.0f, 0.0f};
-        a = V3{0.0f, 1.0f, 0.0f};
+        v = V3{(float) rand() / RAND_MAX * 2 - 1,
+               (float) rand() / RAND_MAX * 2 - 1,
+               (float) rand() / RAND_MAX * 2 - 1} ;
+        a = V3{(float) rand() / RAND_MAX * 2 - 1,
+               (float) rand() / RAND_MAX * 2 - 1,
+               (float) rand() / RAND_MAX * 2 - 1} ;
+        normalize(&v); normalize(&a) ;
         boids.push_back(Boid {p, v, a}) ;
     }
     return boids ;
