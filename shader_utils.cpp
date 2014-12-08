@@ -12,13 +12,13 @@ void print_shader_link_info(GLuint sp) {
     int actual_length = 0;
     char log[2048];
     glGetProgramInfoLog (sp, max_length, &actual_length, log);
-    printf ("program info log for GL index %i:\n%s", sp, log);
+    fprintf(stderr, "program info log for GL index %i:\n%s", sp, log);
 }
 bool shader_is_valid(GLuint sp) {
     int params = -1;
     glValidateProgram (sp);
     glGetProgramiv (sp, GL_VALIDATE_STATUS, &params);
-    printf ("program %i GL_VALIDATE_STATUS = %i\n", sp, params);
+    fprintf(stdout,"program %i GL_VALIDATE_STATUS = %i\n", sp, params);
     if (GL_TRUE != params) {
         print_shader_link_info(sp);
         return false;
