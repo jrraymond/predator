@@ -11,7 +11,7 @@ void update_flock(vector<Boid>& bs) {
         update_boid(&new_b, old_bs) ;
         bs[i] = new_b ;
     }
-    std::cout << "\n====================================\n" ;
+    //std::cout << "\n====================================\n" ;
 }
 //TODO boids align grows super fast, seems to be better now
 void update_boid(Boid* b, vector<Boid>& bs) {
@@ -20,18 +20,18 @@ void update_boid(Boid* b, vector<Boid>& bs) {
     V3 acc, sep, coh, ali, grav, center = V3{0,0,0} ;
 
     seperate(50, b, bs, &sep) ; add(&sep, &acc, &acc) ;
-    debug_v3(&sep, " SEP ") ;
+    //debug_v3(&sep, " SEP ") ;
 
     cohesion(1, b, bs, &coh) ; add(&coh, &acc, &acc) ;
-    debug_v3(&coh, " COH ") ;
+    //debug_v3(&coh, " COH ") ;
 
     //scale(100, &coh) ;
     align(1, bs, &ali) ; add(&ali, &acc, &acc) ;
-    debug_v3(&ali, " ALI ") ;
+    //debug_v3(&ali, " ALI ") ;
 
     //add(&sep,&coh,&acc) ;
     gravity(0.25f, &center, b, &grav) ; add(&grav, &acc, &acc) ;
-    debug_v3(&grav, " GRAV ") ;
+    //debug_v3(&grav, " GRAV ") ;
 
     //debug_v3(&acc, " ACC ") ;
     V3 pos = b->pos ;
@@ -46,7 +46,7 @@ void update_boid(Boid* b, vector<Boid>& bs) {
     b->pos = pos ;
     b->vel = vel ;
     b->acc = acc ;
-    std::cout << "\n------------------------\n" ;
+    //std::cout << "\n------------------------\n" ;
     if (pos.x == NAN || pos.y == NAN || pos.z == NAN) {
         pos.x, pos.y, pos.z = 1.0f ;
         b->pos = pos ;

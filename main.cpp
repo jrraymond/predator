@@ -160,29 +160,36 @@ int main() {
 
     glEnable(GL_DEPTH_TEST) ;
 
-    // ------------------------ Handling Input ----------------------------- //
-    float lastTime = glfwGetTime() ;
-    float thisTime, deltaTime ;
-   // for (int i=0; i<vertices_s; ++i) { vertices[i] = vertices[i] * 0.2 ; }
-    //glBufferSubData(GL_ARRAY_BUFFER, 0, vertices_s, &vbo) ;
+    double last_time = glfwGetTime() * 1000 ; //convert to ms
+    double this_time, elapsed_time ;
+    double lag_time = 0.0f ;
+    double ms_per_update = 16.0f ;
 
     // ---------------------------- RENDERING ------------------------------ //
     //TODO update game loop to do fixed update with variable rendering
     while(!glfwWindowShouldClose(window)) {
-        lastTime = thisTime ;
-        thisTime = glfwGetTime() ;
-        deltaTime = thisTime - lastTime ;
+        this_time = glfwGetTime() * 1000 ; //convert to ms TODO put in inline function
+        elapsed_time = this_time - last_time;
+        lag_time += elapsed_time ;
+        last_time = this_time ;
+        std::cout << this_time << "\t" << last_time << "\t" << elapsed_time << "\t" << lag_time << "\n----------------\n" ;
 
-        handle_input(window, &player1, deltaTime, &view) ;
+        handle_input(window, &player1, elapsed_time, &view) ;
         glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view)) ;
         glUniformMatrix4fv(uni_model, 1, GL_FALSE, glm::value_ptr(model));
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f) ; // Clear the screen to black
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) ;
 
+        while (lag_time >= ms_per_update) {
+            std::cout << "updating . . .\n" ;
+            update_flock(boids) ;
+            lag_time -= ms_per_update ;
+        }
+
         glBindVertexArray(vao_boids) ;
-        update_flock(boids) ;
         debug_boid(&boids[0]) ;
+        std::cout << "rendering . . .\n" ;
         render(boids, vertices, num_boid_vertices) ;
         glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
@@ -199,7 +206,6 @@ int main() {
 
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
-        sleep(0.99) ;
     }
     // ---------------------------- CLEARING ------------------------------ //
     free(grid_xyz) ;
