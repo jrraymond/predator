@@ -29,10 +29,11 @@ struct Vtx {
     V3 color ;
     V3 normal ;
 } ;
-std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
+using std::vector ;
+vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
 void draw_boid(Boid*) ;
 void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
-void render(std::vector<Boid> &boids, Vtx* vertices, int boid_s) ;
+void render(vector<Boid> &boids, Vtx* vertices, int boid_s) ;
 float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) ;
 float* gen_3d_grid(int* size, int* num_pts, int dim, int step) ;
 float* gen_boid_normals(Vtx* vertices, int num_vertices, int* num_pts) ;
@@ -67,12 +68,12 @@ int main() {
                             , 4.0f ,-0.6f, 45.0f } ;
     int params = -1 ;
     // Boid information
-    int boids_s, boid_s, vert_s, vertices_s, elements_s ;
+    int num_boids, boid_s, vert_s, vertices_s, elements_s ;
     vert_s = sizeof(Vtx) ; //for now just position and color info
     boid_s = 12 ; // 12 vertices per boid (4 triangles by 3 verteces)
-    boids_s = 10 ; //for now
-    vertices_s = boids_s * boid_s * vert_s ; //24
-    std::vector<Boid> boids = generate_boids(10, 10, 10, boids_s) ; //TODO use a C array instead because its more metal
+    num_boids = 2 ; //for now
+    vertices_s = num_boids * boid_s * vert_s ; //24
+    vector<Boid> boids = generate_boids(10, 10, 10, num_boids) ;
     // ----------------------------- RESOURCES ----------------------------- //
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER) ; //Create, compile, link shader
     compile_shader("vertex_shader.glsl", vertex_shader) ;
@@ -97,7 +98,7 @@ int main() {
     GLuint vbo_boids ; // Create a Vertex Buffer Object and copy the vertex data to it
     glGenBuffers(1, &vbo_boids) ; //creates buffer object
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
-    int num_boid_vertices = boid_s * boids_s ;
+    int num_boid_vertices = boid_s * num_boids;
     Vtx vertices[num_boid_vertices] ;
     render(boids, vertices, num_boid_vertices) ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
@@ -166,6 +167,7 @@ int main() {
     //glBufferSubData(GL_ARRAY_BUFFER, 0, vertices_s, &vbo) ;
 
     // ---------------------------- RENDERING ------------------------------ //
+    //TODO update game loop to do fixed update with variable rendering
     while(!glfwWindowShouldClose(window)) {
         lastTime = thisTime ;
         thisTime = glfwGetTime() ;
@@ -179,15 +181,13 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) ;
 
         glBindVertexArray(vao_boids) ;
-        //update_flock(boids) ;
-        //orbit(boids, V3 {1, 0, 0}, 0.05f) ;
-        //render(boids, vertices, num_boid_vertices) ;
-        //glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
-        //glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
-
-        //render(boids, vertices, boid_s * vert_s) ;
-        //glDrawElements(GL_TRIANGLES, elements_s, GL_UNSIGNED_INT, 0) ; // Draw using element buffer
+        update_flock(boids) ;
+        debug_boid(&boids[0]) ;
+        render(boids, vertices, num_boid_vertices) ;
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
         glDrawArrays(GL_TRIANGLES, 0, num_boid_vertices) ;
+
 
         glBindVertexArray(vao_grid) ;
         glVertexAttrib3f(col_attr, 1.0f, 0.0f, 0.0f) ;
@@ -199,7 +199,7 @@ int main() {
 
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
-        sleep(0.1) ;
+        sleep(0.99) ;
     }
     // ---------------------------- CLEARING ------------------------------ //
     free(grid_xyz) ;
@@ -239,7 +239,7 @@ void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) 
     *view_ptr = glm::lookAt(p->pos, p->pos + dir, up) ;
 }
 // TODO instancing
-void render(std::vector<Boid> &boids, Vtx* vertices, int num_vs) {
+void render(vector<Boid> &boids, Vtx* vertices, int num_vs) {
     int s = (int) boids.size() ;
     Vtx vtx_0, vtx_1, vtx_2, vtx_3 ; //4 vertices per triangle
     Boid b ;
@@ -312,8 +312,8 @@ void render(std::vector<Boid> &boids, Vtx* vertices, int num_vs) {
         //debug_vtx(&vtx_3) ;
     } ;
 }
-std::vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
-    std::vector<Boid> boids ;
+vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
+    vector<Boid> boids ;
     boids.reserve(number) ;
     std::random_device                  rand_dev ;
     std::mt19937                        generator(rand_dev()) ;

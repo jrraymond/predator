@@ -9,13 +9,15 @@ struct Boid {
     V3 vel ;
     V3 acc ;
 } ;
-void update_flock(std::vector<Boid> bs) ;
-void update_boid(Boid* b, std::vector<Boid> bs) ;
-void seperate(float s, const Boid* b, const std::vector<Boid> bs, V3* sep) ;
-void cohesion(float x, const Boid* b, const std::vector<Boid> bs, V3* coh) ;
-void align(float x, const std::vector<Boid> bs, V3* ali) ;
-V3 centroid(std::vector<Boid> bs) ;
+using std::vector ;
+void update_flock(vector<Boid> &bs) ;
+void update_boid(Boid* b, vector<Boid> &bs) ;
+void seperate(float s, const Boid* b, const vector<Boid> &bs, V3* sep) ;
+void cohesion(float x, const Boid* b, const vector<Boid> &bs, V3* coh) ;
+void align(float x, const vector<Boid> &bs, V3* ali) ;
+V3 centroid(const vector<Boid> &bs) ;
 void debug_boid(Boid* b) ;
-void orbit(std::vector<Boid> &bs, V3 v, float angle) ;
+void orbit(vector<Boid> &bs, V3 v, float angle) ;
+void gravity(float mass, V3* m, const Boid* b, V3* v) ;
 
 #endif
