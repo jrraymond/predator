@@ -33,12 +33,13 @@ using std::vector ;
 vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
 void draw_boid(Boid*) ;
 void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
-void render(vector<Boid> &boids, Vtx* vertices, int boid_s) ;
+void render(vector<Boid> &boids, Vtx* vertices, int boid_s, double delta) ;
 float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) ;
 float* gen_3d_grid(int* size, int* num_pts, int dim, int step) ;
 float* gen_boid_normals(Vtx* vertices, int num_vertices, int* num_pts) ;
 void debug_vtx(Vtx v);
 void debug_vertices(Vtx* vs, int size);
+double inline sec_to_ms(double seconds);
 
 
 int main() {
@@ -100,7 +101,7 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
     int num_boid_vertices = boid_s * num_boids;
     Vtx vertices[num_boid_vertices] ;
-    render(boids, vertices, num_boid_vertices) ;
+    render(boids, vertices, num_boid_vertices, lag_time / ms_per_update) ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
 
     glEnableVertexAttribArray(pos_attr) ;
@@ -160,7 +161,7 @@ int main() {
 
     glEnable(GL_DEPTH_TEST) ;
 
-    double last_time = glfwGetTime() * 1000 ; //convert to ms
+    double last_time = sec_to_ms(glfwGetTime()) ;
     double this_time, elapsed_time ;
     double lag_time = 0.0f ;
     double ms_per_update = 16.0f ;
@@ -168,7 +169,7 @@ int main() {
     // ---------------------------- RENDERING ------------------------------ //
     //TODO update game loop to do fixed update with variable rendering
     while(!glfwWindowShouldClose(window)) {
-        this_time = glfwGetTime() * 1000 ; //convert to ms TODO put in inline function
+        this_time = sec_to_ms(glfwGetTime()) ;
         elapsed_time = this_time - last_time;
         lag_time += elapsed_time ;
         last_time = this_time ;
@@ -190,7 +191,7 @@ int main() {
         glBindVertexArray(vao_boids) ;
         debug_boid(&boids[0]) ;
         std::cout << "rendering . . .\n" ;
-        render(boids, vertices, num_boid_vertices) ;
+        render(boids, vertices, num_boid_vertices) ; //TODO render with current velocity
         glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
         glDrawArrays(GL_TRIANGLES, 0, num_boid_vertices) ;
@@ -245,7 +246,8 @@ void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) 
     *view_ptr = glm::lookAt(p->pos, p->pos + dir, up) ;
 }
 // TODO instancing
-void render(vector<Boid> &boids, Vtx* vertices, int num_vs) {
+// TODO take into account time between frames (delta)
+void render(vector<Boid> &boids, Vtx* vertices, int num_vs, double delta) {
     int s = (int) boids.size() ;
     Vtx vtx_0, vtx_1, vtx_2, vtx_3 ; //4 vertices per triangle
     Boid b ;
@@ -465,4 +467,9 @@ void debug_vertices(Vtx* vs, int size) {
         debug_vtx(vs[i]) ;
     }
     std::cout << std::endl ;
+}
+
+
+double inline sec_to_ms(double seconds) {
+    return seconds * 1000 ;
 }
