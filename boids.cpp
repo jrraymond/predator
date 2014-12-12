@@ -3,18 +3,18 @@
 #include "boids.h"
 using std::vector ;
 
-void update_flock(vector<Boid>& bs) {
+void update_flock(vector<Boid>& bs, int x_max, int y_max, int z_max) {
     unsigned long sz = bs.size() ;
     vector<Boid> old_bs(bs) ;
     for (int i = 0; i < sz; ++i) {
         Boid new_b(old_bs[i]) ;
-        update_boid(&new_b, old_bs) ;
+        update_boid(&new_b, old_bs, x_max, y_max, z_max) ;
         bs[i] = new_b ;
     }
     //std::cout << "\n====================================\n" ;
 }
 //TODO boids align grows super fast, seems to be better now
-void update_boid(Boid* b, vector<Boid>& bs) {
+void update_boid(Boid* b, vector<Boid>& bs, int x_max, int y_max, int z_max) {
     float max_acc = 0.001f ;
     float max_vel = 1.0f ;
     V3 acc, sep, coh, ali, grav, center = V3{0,0,0} ;
@@ -43,6 +43,7 @@ void update_boid(Boid* b, vector<Boid>& bs) {
     //normalize(&vel) ;
     //debug_v3(&vel, " VEL ") ;
     add(&vel, &pos, &pos) ;
+
     b->pos = pos ;
     b->vel = vel ;
     b->acc = acc ;

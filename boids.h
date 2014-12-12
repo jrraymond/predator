@@ -10,8 +10,8 @@ struct Boid {
     V3 acc ;
 } ;
 using std::vector ;
-void update_flock(vector<Boid> &bs) ;
-void update_boid(Boid* b, vector<Boid> &bs) ;
+void update_flock(vector<Boid> &bs, int x_max, int y_max, int z_max) ;
+void update_boid(Boid* b, vector<Boid> &bs, int x_max, int y_max, int z_max) ;
 void seperate(float s, const Boid* b, const vector<Boid> &bs, V3* sep) ;
 void cohesion(float x, const Boid* b, const vector<Boid> &bs, V3* coh) ;
 void align(float x, const vector<Boid> &bs, V3* ali) ;

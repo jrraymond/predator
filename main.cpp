@@ -13,6 +13,7 @@
 #include <glm/gtx/string_cast.hpp>
 #include <unistd.h>
 #include "shader_utils.h"
+#include "object.h"
 
 //TODO finish 3d grid using instancing
 enum Axis  { X_AXIS, Y_AXIS, Z_AXIS } ;
@@ -23,11 +24,6 @@ struct Player {
     float h_angle ;
     float v_angle ;
     float fov ;
-} ;
-struct Vtx {
-    V3 position ;
-    V3 color ;
-    V3 normal ;
 } ;
 using std::vector ;
 vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
@@ -68,6 +64,8 @@ int main() {
                             , glm::vec3(0.0f, 0.0f, 0.0f)
                             , 4.0f ,-0.6f, 45.0f } ;
     int params = -1 ;
+    int x_max = 100, y_max = 100, z_max = 100 ;
+    int frames = 0 ;
     // Boid information
     int num_boids, boid_s, vert_s, vertices_s, elements_s ;
     vert_s = sizeof(Vtx) ; //for now just position and color info
@@ -92,6 +90,8 @@ int main() {
     glGenVertexArrays(1, &vao_boids) ;
     GLuint vao_grid ; //grid
     glGenVertexArrays(1, &vao_grid) ;
+    GLuint vao_iboxes ;
+    glGenVertexArrays(1, &vao_iboxes) ;
     //GLuint vao_normals ; //normals
     //glGenVertexArrays(1, &vao_normals) ;
 
@@ -101,7 +101,6 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
     int num_boid_vertices = boid_s * num_boids;
     Vtx vertices[num_boid_vertices] ;
-    render(boids, vertices, num_boid_vertices, lag_time / ms_per_update) ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
 
     glEnableVertexAttribArray(pos_attr) ;
@@ -123,6 +122,24 @@ int main() {
     glEnableVertexAttribArray(pos_attr) ;
     glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;
     glVertexAttrib3f(col_attr, 1.0f, 0.0f, 0.0f) ;
+
+    glBindVertexArray(vao_iboxes) ;
+    GLuint vbo_iboxes ;
+    glGenBuffers(1, &vbo_iboxes) ;
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_iboxes) ;
+    int num_iboxes = 1 ;
+    int ibox_pt_s = 3 ;
+    int ibox_s = 24 ; //12 lines, 2 vertices per line
+    int num_iboxes_pts = ibox_s * num_iboxes ;
+    float ibox_vertices[num_iboxes_pts * ibox_pt_s] ;
+    vector<InvertedBox> iboxes ;
+    InvertedBox bounding_box (0,0,0,10, 10, 10,1,1,1,1) ;
+    iboxes.push_back(bounding_box) ;
+    InvertedBox::render(iboxes, ibox_vertices) ;
+    glBufferData(GL_ARRAY_BUFFER, sizeof(ibox_vertices), ibox_vertices, GL_STATIC_DRAW) ;
+    glEnableVertexAttribArray(pos_attr) ;
+    glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;
+    glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
 
     //glBindVertexArray(vao_normals) ;
     //GLuint vbo_normals ;
@@ -150,6 +167,7 @@ int main() {
     glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(uni_proj, 1, GL_FALSE, glm::value_ptr(proj));
     GLint uni_amb = glGetUniformLocation(shader_prog, "ambient") ;
+    glm::vec3 white_light (1.0f,1.0f,1.0f) ;
     glm::vec3 ambient_light (0.1f, 0.1f, 0.1f) ;
     glUniform3fv(uni_amb, 1, &ambient_light[0]) ;
     GLint uni_light = glGetUniformLocation(shader_prog, "light_model") ;
@@ -175,7 +193,7 @@ int main() {
         last_time = this_time ;
         std::cout << this_time << "\t" << last_time << "\t" << elapsed_time << "\t" << lag_time << "\n----------------\n" ;
 
-        handle_input(window, &player1, elapsed_time, &view) ;
+        handle_input(window, &player1, 0.1f, &view) ;
         glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view)) ;
         glUniformMatrix4fv(uni_model, 1, GL_FALSE, glm::value_ptr(model));
 
@@ -184,14 +202,15 @@ int main() {
 
         while (lag_time >= ms_per_update) {
             std::cout << "updating . . .\n" ;
-            update_flock(boids) ;
+            //update_flock(boids, x_max, y_max, z_max) ;
             lag_time -= ms_per_update ;
         }
 
         glBindVertexArray(vao_boids) ;
         debug_boid(&boids[0]) ;
+        ++frames ;
         std::cout << "rendering . . .\n" ;
-        render(boids, vertices, num_boid_vertices) ; //TODO render with current velocity
+        render(boids, vertices, num_boid_vertices, lag_time / ms_per_update) ; //TODO render with current velocity
         glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
         glDrawArrays(GL_TRIANGLES, 0, num_boid_vertices) ;
@@ -199,7 +218,12 @@ int main() {
 
         glBindVertexArray(vao_grid) ;
         glVertexAttrib3f(col_attr, 1.0f, 0.0f, 0.0f) ;
+        glUniform3fv(uni_amb, 1, &white_light[0]) ;
         glDrawArrays(GL_LINES, 0, num_grid_pts) ;
+
+        glBindVertexArray(vao_iboxes) ;
+        glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
+        glDrawArrays(GL_LINES, 0, num_iboxes_pts) ;
 
         //glBindVertexArray(vao_normals) ;
         //glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
@@ -207,6 +231,9 @@ int main() {
 
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
+        if (frames % 1000 == 0) {
+            std::cout << "Frames: " << frames << "\t fps: \n" ;
+        }
     }
     // ---------------------------- CLEARING ------------------------------ //
     free(grid_xyz) ;
@@ -244,6 +271,7 @@ void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) { p->pos += dir * dt * speed ; }
     glm::vec3 up = glm::cross(right, dir) ;
     *view_ptr = glm::lookAt(p->pos, p->pos + dir, up) ;
+    //std::cout << p->pos.z << "," << p->pos.y << "," << p->pos.z << "\n" ;
 }
 // TODO instancing
 // TODO take into account time between frames (delta)
