@@ -26,7 +26,7 @@ struct Player {
     float fov ;
 } ;
 using std::vector ;
-vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) ;
+
 void draw_boid(Boid*) ;
 void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
 void render(vector<Boid> &boids, Vtx* vertices, int boid_s, double delta) ;
@@ -36,6 +36,9 @@ float* gen_boid_normals(Vtx* vertices, int num_vertices, int* num_pts) ;
 void debug_vtx(Vtx v);
 void debug_vertices(Vtx* vs, int size);
 double inline sec_to_ms(double seconds);
+
+void update_physics(vector<Boid>& bs, vector<InvertedBox>& objs,
+                    float x_max, float y_max, float z_max) ;
 
 
 int main() {
@@ -65,14 +68,16 @@ int main() {
                             , 4.0f ,-0.6f, 45.0f } ;
     int params = -1 ;
     int x_max = 100, y_max = 100, z_max = 100 ;
-    int frames = 0 ;
+    int frames_rendered = 0 ;
+    int physics_updates = 0 ;
     // Boid information
     int num_boids, boid_s, vert_s, vertices_s, elements_s ;
     vert_s = sizeof(Vtx) ; //for now just position and color info
     boid_s = 12 ; // 12 vertices per boid (4 triangles by 3 verteces)
-    num_boids = 2 ; //for now
+    num_boids = 10 ; //for now
     vertices_s = num_boids * boid_s * vert_s ; //24
     vector<Boid> boids = generate_boids(10, 10, 10, num_boids) ;
+    vector<InvertedBox> iboxes ;
     // ----------------------------- RESOURCES ----------------------------- //
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER) ; //Create, compile, link shader
     compile_shader("vertex_shader.glsl", vertex_shader) ;
@@ -132,8 +137,7 @@ int main() {
     int ibox_s = 24 ; //12 lines, 2 vertices per line
     int num_iboxes_pts = ibox_s * num_iboxes ;
     float ibox_vertices[num_iboxes_pts * ibox_pt_s] ;
-    vector<InvertedBox> iboxes ;
-    InvertedBox bounding_box (0,0,0,10, 10, 10,1,1,1,1) ;
+    InvertedBox bounding_box (0,0,0,20, 20, 20,1,1,1,1) ;
     iboxes.push_back(bounding_box) ;
     InvertedBox::render(iboxes, ibox_vertices) ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(ibox_vertices), ibox_vertices, GL_STATIC_DRAW) ;
@@ -191,7 +195,7 @@ int main() {
         elapsed_time = this_time - last_time;
         lag_time += elapsed_time ;
         last_time = this_time ;
-        std::cout << this_time << "\t" << last_time << "\t" << elapsed_time << "\t" << lag_time << "\n----------------\n" ;
+       // std::cout << this_time << "\t" << last_time << "\t" << elapsed_time << "\t" << lag_time << "\n----------------\n" ;
 
         handle_input(window, &player1, 0.1f, &view) ;
         glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(view)) ;
@@ -201,15 +205,15 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) ;
 
         while (lag_time >= ms_per_update) {
-            std::cout << "updating . . .\n" ;
-            //update_flock(boids, x_max, y_max, z_max) ;
+            //std::cout << "updating . . .\n" ;
+            ++physics_updates ;
+            update_physics(boids, iboxes, x_max, y_max, z_max) ;
             lag_time -= ms_per_update ;
         }
 
+        ++frames_rendered ;
+
         glBindVertexArray(vao_boids) ;
-        debug_boid(&boids[0]) ;
-        ++frames ;
-        std::cout << "rendering . . .\n" ;
         render(boids, vertices, num_boid_vertices, lag_time / ms_per_update) ; //TODO render with current velocity
         glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
@@ -231,8 +235,8 @@ int main() {
 
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
-        if (frames % 1000 == 0) {
-            std::cout << "Frames: " << frames << "\t fps: \n" ;
+        if (frames_rendered % 1000 == 0) {
+            std::cout << "Frames rendered: " << frames_rendered << "\t physics updates: " << physics_updates << std::endl ;
         }
     }
     // ---------------------------- CLEARING ------------------------------ //
@@ -348,30 +352,11 @@ void render(vector<Boid> &boids, Vtx* vertices, int num_vs, double delta) {
         //debug_vtx(&vtx_3) ;
     } ;
 }
-vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
-    vector<Boid> boids ;
-    boids.reserve(number) ;
-    std::random_device                  rand_dev ;
-    std::mt19937                        generator(rand_dev()) ;
-    std::uniform_int_distribution<int>  r_x(-max_x, max_x) ;
-    std::uniform_int_distribution<int>  r_y(-max_y, max_y) ;
-    std::uniform_int_distribution<int>  r_z(-max_z, max_z) ;
-    int x, y, z ;
-    V3 p, v, a ;
-    for (int i = 0 ; i < number ; ++i) {
-        x = r_x(generator) ; y = r_y(generator) ; z = r_z(generator) ;
-        p = V3{(float) x, (float) y, (float) z} ;
-        v = V3{(float) rand() / RAND_MAX * 2 - 1,
-               (float) rand() / RAND_MAX * 2 - 1,
-               (float) rand() / RAND_MAX * 2 - 1} ;
-        a = V3{(float) rand() / RAND_MAX * 2 - 1,
-               (float) rand() / RAND_MAX * 2 - 1,
-               (float) rand() / RAND_MAX * 2 - 1} ;
-        normalize(&v); normalize(&a) ;
-        boids.push_back(Boid {p, v, a}) ;
-    }
-    return boids ;
+void update_physics(vector<Boid>& bs, vector<InvertedBox>& iboxes,
+                    float x_max, float y_max, float z_max) {
+    update_flock(bs, iboxes, x_max, y_max, z_max) ;
 }
+
 float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) {
     int vert_s = 3 ;
     *num_pts = (2 * dim / step + 1) * 4 ;

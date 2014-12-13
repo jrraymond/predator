@@ -20,7 +20,7 @@ class InvertedBox : Obj {
 public:
     float x, y, z, pdx, pdy, pdz, ndx, ndy, ndz, r, g, b, a ;
 
-    V3 collides(V3 p, V3 v, float t) { };
+    V3 collides(V3 p, V3 v, float t) ;
 
     void render() { };
     static void render(vector<InvertedBox>& iboxes, float* pts) ;

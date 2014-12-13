@@ -1,25 +1,33 @@
 /** The codes for the boids will go here
 */
+#include <random>
+#include <iostream>
 #include "boids.h"
+
+
 using std::vector ;
 
-void update_flock(vector<Boid>& bs, int x_max, int y_max, int z_max) {
+void update_flock(vector<Boid>& bs,
+                  vector<InvertedBox>& iboxes,
+                  int x_max, int y_max, int z_max) {
     unsigned long sz = bs.size() ;
     vector<Boid> old_bs(bs) ;
     for (int i = 0; i < sz; ++i) {
         Boid new_b(old_bs[i]) ;
-        update_boid(&new_b, old_bs, x_max, y_max, z_max) ;
+        update_boid(&new_b, old_bs, iboxes, x_max, y_max, z_max) ;
         bs[i] = new_b ;
     }
     //std::cout << "\n====================================\n" ;
 }
 //TODO boids align grows super fast, seems to be better now
-void update_boid(Boid* b, vector<Boid>& bs, int x_max, int y_max, int z_max) {
+void update_boid(Boid* b, vector<Boid>& bs,
+                 vector<InvertedBox>& iboxes,
+                 int x_max, int y_max, int z_max) {
     float max_acc = 0.001f ;
     float max_vel = 1.0f ;
     V3 acc, sep, coh, ali, grav, center = V3{0,0,0} ;
 
-    seperate(50, b, bs, &sep) ; add(&sep, &acc, &acc) ;
+    seperate(500, b, bs, &sep) ; add(&sep, &acc, &acc) ;
     //debug_v3(&sep, " SEP ") ;
 
     cohesion(1, b, bs, &coh) ; add(&coh, &acc, &acc) ;
@@ -41,19 +49,28 @@ void update_boid(Boid* b, vector<Boid>& bs, int x_max, int y_max, int z_max) {
     scale(max_acc / mag(&acc), &acc) ;
     scale(max_vel / mag(&vel), &vel) ;
     //normalize(&vel) ;
-    //debug_v3(&vel, " VEL ") ;
     add(&vel, &pos, &pos) ;
+    //debug_v3(&vel, " VEL0 ") ;
+
+    for(int i=0; i< iboxes.size();++i) { // collisions
+        V3 v = iboxes[i].collides(pos, vel, 1) ;
+        if (!(v.x == 0 && v.y == 0 && v.z == 0)) {
+            vel = v ;
+        }
+    }
+    if (pos.x > x_max || pos.x < -x_max
+        || pos.y > y_max || pos.y < -y_max
+        || pos.z > z_max || pos.z < -z_max) {
+        pos = V3 {0.0,0.0,0.0} ;
+        vel = V3 {0.0,0.0,0.0} ;
+        acc = V3 {0.0,0.0,0.0} ;
+    }
+
 
     b->pos = pos ;
     b->vel = vel ;
     b->acc = acc ;
-    //std::cout << "\n------------------------\n" ;
-    if (pos.x == NAN || pos.y == NAN || pos.z == NAN) {
-        pos.x, pos.y, pos.z = 1.0f ;
-        b->pos = pos ;
-        b->vel = V3{0.1f, 0.1f, 0.1f} ;
-        b->acc = V3{0.1f, 0.1f, 0.1f} ;
-    }
+
 }
 
 void seperate(float s, const Boid* b, const vector<Boid>& bs, V3* sep) {
@@ -128,4 +145,29 @@ void gravity(float mass, V3* m, const Boid* b, V3* v) {
     float s = mag2(&dist) ;
     scale(1 / s * mass, &dist) ;
     add(&dist, v, v) ;
+}
+
+vector<Boid> generate_boids(int max_x, int max_y, int max_z, int number) {
+    vector<Boid> boids ;
+    boids.reserve(number) ;
+    std::random_device                  rand_dev ;
+    std::mt19937                        generator(rand_dev()) ;
+    std::uniform_int_distribution<int>  r_x(-max_x, max_x) ;
+    std::uniform_int_distribution<int>  r_y(-max_y, max_y) ;
+    std::uniform_int_distribution<int>  r_z(-max_z, max_z) ;
+    int x, y, z ;
+    V3 p, v, a ;
+    for (int i = 0 ; i < number ; ++i) {
+        x = r_x(generator) ; y = r_y(generator) ; z = r_z(generator) ;
+        p = V3{(float) x, (float) y, (float) z} ;
+        v = V3{(float) rand() / RAND_MAX * 2 - 1,
+               (float) rand() / RAND_MAX * 2 - 1,
+               (float) rand() / RAND_MAX * 2 - 1} ;
+        a = V3{(float) rand() / RAND_MAX * 2 - 1,
+               (float) rand() / RAND_MAX * 2 - 1,
+               (float) rand() / RAND_MAX * 2 - 1} ;
+        normalize(&v); normalize(&a) ;
+        boids.push_back(Boid {p, v, a}) ;
+    }
+    return boids ;
 }
