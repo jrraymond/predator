@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include "shader_utils.h"
 #include "object.h"
+#include "text.h"
 
 //TODO finish 3d grid using instancing
 enum Axis  { X_AXIS, Y_AXIS, Z_AXIS } ;
