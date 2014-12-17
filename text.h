@@ -13,16 +13,19 @@ private:
     GLuint vertex_shader ;
     GLuint fragment_shader ;
     GLuint shader_program ;
-    GLuint tex ;
+    GLuint texture ;
+    GLuint vao ;
     GLuint vbo ;
-    int uniform_tex ;
-    GLuint attribute_coord ;
+    GLuint texture_uniform ;
+    GLuint color_uniform ;
+    GLuint pos_attr ;
     static bool instantiated_ ;
 public:
     Text() ;
     void load_font_face(std::string f_name) ;
     void set_pixel_size(int i) ;
     void render(std::string s, float x, float y, float sx, float sy) ;
+    void print_face_info() ;
     ~Text() ;
 } ;
 #endif

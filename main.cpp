@@ -14,7 +14,6 @@
 #include <unistd.h>
 #include "shader_utils.h"
 #include "object.h"
-#include "text.h"
 
 //TODO finish 3d grid using instancing
 enum Axis  { X_AXIS, Y_AXIS, Z_AXIS } ;
@@ -41,7 +40,6 @@ double inline sec_to_ms(double seconds);
 void update_physics(vector<Boid>& bs, vector<InvertedBox>& objs,
                     float x_max, float y_max, float z_max) ;
 
-
 int main() {
     // -------------------------------- INIT ------------------------------- //
     if (glfwInit() != GL_TRUE) {
@@ -55,7 +53,8 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE) ;
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE) ;
 
-    GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", NULL, NULL) ;
+    int window_h = 600, window_w = 800 ;
+    GLFWwindow* window = glfwCreateWindow(window_w, window_h, "OpenGL", NULL, NULL) ;
     glfwMakeContextCurrent(window) ;
 
     glewExperimental = GL_TRUE ;
@@ -158,6 +157,12 @@ int main() {
     //glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;
     //glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
 
+    // ------- Text Rendering Resources ------
+    //Text text_renderer ;
+    //text_renderer.Text::load_font_face("OpenSans-Regular.ttf") ;
+    //text_renderer.Text::print_face_info() ;
+
+
     glm::mat4 model = glm::mat4() ;
     glm::mat4 view = glm::lookAt(
             glm::vec3(10.0f, 10.0f, 10.0f),
@@ -181,6 +186,7 @@ int main() {
     GLint uni_spec = glGetUniformLocation(shader_prog, "spec_coefficient") ;
     GLfloat specular_coefficient = 10.0f ;
     glUniform1f(uni_spec, specular_coefficient) ;
+
 
     glEnable(GL_DEPTH_TEST) ;
 
@@ -230,9 +236,7 @@ int main() {
         glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
         glDrawArrays(GL_LINES, 0, num_iboxes_pts) ;
 
-        //glBindVertexArray(vao_normals) ;
-        //glVertexAttrib3f(col_attr, 1.0f, 1.0f, 1.0f) ;
-        //glDrawArrays(GL_LINES, 0, num_normal_pts) ;
+        //text_renderer.Text::render("TEXT", 0,0,2.0f / window_w,2.0f / window_h) ;
 
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;

@@ -86,3 +86,12 @@ bool link_shader(GLuint prog, std::initializer_list<GLuint> shaders) {
     }
     return true ;
 }
+void check_gl_errors(std::string s) {
+    GLenum gl_err = glGetError();
+    if (GL_NO_ERROR != gl_err) {
+        fprintf(stderr, "%s: gl error: %i, %s\n", s.c_str(), gl_err, gluErrorString(gl_err));
+    }
+    else {
+        fprintf(stderr, "%s: no gl error\n", s.c_str()) ;
+    }
+}

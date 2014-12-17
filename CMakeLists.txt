@@ -32,7 +32,12 @@ add_executable(flock_herd_school ${SOURCE_FILES})
 #target_link_libraries(flock_herd_school ${GLFW_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})
 target_link_libraries(flock_herd_school  ${GLFW_LIBRARIES} X11 Xxf86vm Xrandr pthread Xi ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES} ${FREETYPE_LIBRARIES})
 
-set(shaders "vertex_shader.glsl" "fragment_shader.glsl")
+set(shaders "vertex_shader.glsl"
+            "fragment_shader.glsl"
+            "text_vertex_shader.glsl"
+            "text_fragment_shader.glsl"
+            "OpenSans-Regular.ttf"
+            "FreeSans.ttf")
 if (NOT CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR)
     foreach(item IN LISTS shaders)
         configure_file(
