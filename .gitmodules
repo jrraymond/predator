@@ -1,0 +1,6 @@
+[submodule "gl_text"]
+	path = lib/gl_text
+	url = git@github.com:jrraymond/gl_text.git
+[submodule "shader_utils"]
+	path = lib/shader_utils
+	url = git@github.com:jrraymond/shader_utils.git

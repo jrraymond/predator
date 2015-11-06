@@ -25,8 +25,8 @@ include_directories(${FREETYPE_INCLUDE_DIRS})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-set(HEADERS vector3.h boids.h shader_utils.h object.h text.h)
-set(SOURCE_FILES main.cpp boids.cpp vector3.cpp shader_utils.cpp object.cpp text.cpp)
+set(HEADERS vector3.h boids.h lib/shader_utils/shader_utils.h object.h lib/gl_text/text.h)
+set(SOURCE_FILES main.cpp boids.cpp vector3.cpp lib/shader_utils/shader_utils.cpp object.cpp lib/gl_text/text.cpp)
 add_executable(flock_herd_school ${SOURCE_FILES})
 
 #target_link_libraries(flock_herd_school ${GLFW_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})

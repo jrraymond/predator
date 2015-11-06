@@ -12,8 +12,9 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <unistd.h>
-#include "shader_utils.h"
+#include "lib/shader_utils/shader_utils.h"
 #include "object.h"
+#include "lib/gl_text/text.h"
 
 //TODO finish 3d grid using instancing
 enum Axis  { X_AXIS, Y_AXIS, Z_AXIS } ;
@@ -62,6 +63,7 @@ int main() {
         fprintf(stderr, "Failed to initialize GLEW\n") ;
         return -1 ;
     }
+    Text text ("OpenSans-Regular.ttf") ;
     Player player1 = Player { glm::vec3(10.0f, 10.0f, 10.0f)
                             , glm::vec3(0.0f, 0.0f, 0.0f)
                             , glm::vec3(0.0f, 0.0f, 0.0f)
@@ -237,6 +239,7 @@ int main() {
         glDrawArrays(GL_LINES, 0, num_iboxes_pts) ;
 
         //text_renderer.Text::render("TEXT", 0,0,2.0f / window_w,2.0f / window_h) ;
+        //text.Text::display
 
         glfwSwapBuffers(window) ; // Swap buffers and poll window events
         glfwPollEvents() ;
