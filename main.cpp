@@ -69,7 +69,7 @@ int main() {
                             , glm::vec3(0.0f, 0.0f, 0.0f)
                             , 4.0f ,-0.6f, 45.0f } ;
     int params = -1 ;
-    int x_max = 100, y_max = 100, z_max = 100 ;
+    int x_max = 1000, y_max = 1000, z_max = 1000 ;
     int frames_rendered = 0 ;
     int physics_updates = 0 ;
     // Boid information
@@ -139,7 +139,7 @@ int main() {
     int ibox_s = 24 ; //12 lines, 2 vertices per line
     int num_iboxes_pts = ibox_s * num_iboxes ;
     float ibox_vertices[num_iboxes_pts * ibox_pt_s] ;
-    InvertedBox bounding_box (0,0,0,20, 20, 20,1,1,1,1) ;
+    InvertedBox bounding_box (0,0,0,20,20,20,1,1,1,1) ;
     iboxes.push_back(bounding_box) ;
     InvertedBox::render(iboxes, ibox_vertices) ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(ibox_vertices), ibox_vertices, GL_STATIC_DRAW) ;
@@ -277,11 +277,13 @@ void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) 
     glm::vec3 right = glm::vec3( sin(p->h_angle - 3.14f/2.0f)
                                , 0
                                , cos(p->h_angle - 3.14f/2.0f)) ;
+    glm::vec3 up = glm::cross(right, dir) ;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) { p->pos += right * dt * speed ; }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) { p->pos -= right * dt * speed ;  }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) { p->pos -= dir * dt * speed ; }
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) { p->pos += dir * dt * speed ; }
-    glm::vec3 up = glm::cross(right, dir) ;
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) { p->pos += up * dt * speed ; }
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) { p->pos -= up * dt * speed ; }
     *view_ptr = glm::lookAt(p->pos, p->pos + dir, up) ;
     //std::cout << p->pos.z << "," << p->pos.y << "," << p->pos.z << "\n" ;
 }

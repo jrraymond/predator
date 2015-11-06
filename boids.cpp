@@ -23,14 +23,14 @@ void update_flock(vector<Boid>& bs,
 void update_boid(Boid* b, vector<Boid>& bs,
                  vector<InvertedBox>& iboxes,
                  int x_max, int y_max, int z_max) {
-    float max_acc = 0.001f ;
-    float max_vel = 1.0f ;
+    float max_acc = 0.0001f ;
+    float max_vel = 0.05f ;
     V3 acc, sep, coh, ali, grav, center = V3{0,0,0} ;
 
-    seperate(500, b, bs, &sep) ; add(&sep, &acc, &acc) ;
+    seperate(5, b, bs, &sep) ; add(&sep, &acc, &acc) ;
     //debug_v3(&sep, " SEP ") ;
 
-    cohesion(1, b, bs, &coh) ; add(&coh, &acc, &acc) ;
+    cohesion(0.5, b, bs, &coh) ; add(&coh, &acc, &acc) ;
     //debug_v3(&coh, " COH ") ;
 
     //scale(100, &coh) ;
@@ -38,7 +38,7 @@ void update_boid(Boid* b, vector<Boid>& bs,
     //debug_v3(&ali, " ALI ") ;
 
     //add(&sep,&coh,&acc) ;
-    gravity(0.25f, &center, b, &grav) ; add(&grav, &acc, &acc) ;
+    //gravity(0.25f, &center, b, &grav) ; add(&grav, &acc, &acc) ;
     //debug_v3(&grav, " GRAV ") ;
 
     //debug_v3(&acc, " ACC ") ;
@@ -52,7 +52,7 @@ void update_boid(Boid* b, vector<Boid>& bs,
     add(&vel, &pos, &pos) ;
     //debug_v3(&vel, " VEL0 ") ;
 
-    for(int i=0; i< iboxes.size();++i) { // collisions
+    for(int i=0; i < iboxes.size();++i) { // collisions
         V3 v = iboxes[i].collides(pos, vel, 1) ;
         if (!(v.x == 0 && v.y == 0 && v.z == 0)) {
             vel = v ;
@@ -65,12 +65,9 @@ void update_boid(Boid* b, vector<Boid>& bs,
         vel = V3 {0.0,0.0,0.0} ;
         acc = V3 {0.0,0.0,0.0} ;
     }
-
-
     b->pos = pos ;
     b->vel = vel ;
     b->acc = acc ;
-
 }
 
 void seperate(float s, const Boid* b, const vector<Boid>& bs, V3* sep) {
