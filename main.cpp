@@ -24,8 +24,8 @@
 //TODO finish 3d grid using instancing
 using std::vector ;
 
-const FlockConfig default_flock_config { 5, 1, 1, 20, 0.05, 0.0001 };
-const GameConfig default_game_config { default_flock_config };
+const FlockConfig default_flock_config { 5, 5, 0.5, 1, 100, 0.1, 0.1};
+const GameConfig default_game_config { default_flock_config, 5, 10 };
 
 void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
 double inline sec_to_ms(double seconds);
@@ -60,12 +60,8 @@ int main() {
     int frames_rendered = 0 ;
     int physics_updates = 0 ;
     // Boid information
-    int num_boids, boid_s, vert_s, vertices_s, elements_s ;
-    vert_s = sizeof(Vtx) ; //for now just position and color info
-    boid_s = 12 ; // 12 vertices per boid (4 triangles by 3 verteces)
-    num_boids = 10 ; //for now
-    vertices_s = num_boids * boid_s * vert_s ; //24
-    vector<InvertedBox> iboxes ;
+    int num_boids, boid_s, vert_s;
+    num_boids = 500 ; //for now
     // init game state
     GameState game_state ;
     game_state.config = default_game_config;
@@ -81,6 +77,10 @@ int main() {
                                , glm::vec3(0.0f, 0.0f, 0.0f)
                                , 4.0f ,-0.6f, 45.0f } ;
     game_state.boid_physics_objs = spawn_boids(10, 10, 10, 1, 0, num_boids) ;
+    InvertedBox bounding_box (0,0,0,20,20,20,1,1,1,1) ;
+    vector<InvertedBox> iboxes;
+    iboxes.push_back(bounding_box) ;
+    game_state.iboxes = std::move(iboxes);
     GraphicsEngine graphics_engine (game_state);
     // ----------------------------- RESOURCES ----------------------------- //
     //graphics_engine.add_shaders("vertex_shader.glsl","fragment_shader.glsl");
@@ -177,7 +177,7 @@ vector<PhysicsObject> spawn_boids(int max_x, int max_y, int max_z, int sz, int s
         radius = mass;
         PhysicsObject obj {mass, p, v, a, f, radius};
         objs.push_back(obj) ;
-        obj.debug("spawned: ");
+        //obj.debug("spawned: ");
     }
     return objs ;
 }

@@ -9,10 +9,13 @@ using std::vector;
 
 /* returns force on physics object based on boid flocking rules */
 V3 boid_forces(const PhysicsObject &b, vector<PhysicsObject> &bs, const FlockConfig config) {
-    V3 f, sep, coh, ali = V3{0,0,0} ;
-    seperate(config.seperate_factor, b, bs, &sep) ;
-    cohesion(config.cohesion_factor, b, bs, &coh) ;
-    align(config.align_factor, bs, &ali) ;
+    V3 f, sep, coh, ali;
+    assert(f.x==0 and f.y == 0 and f.z ==0);
+    vector<PhysicsObject> flock = get_flock(config.flock_distance, b, bs);
+    seperate(config.seperate_factor, b, flock, &sep);
+    cohesion(config.cohesion_factor, b, flock, &coh) ;
+    align(config.align_factor, flock, &ali) ;
+    //std::cout << "sep: " << sep << " coh: " << coh << " ali: " << ali << std::endl;
     add(&sep, &f, &f) ;
     add(&coh, &f, &f) ;
     add(&ali, &f, &f) ;
@@ -21,23 +24,21 @@ V3 boid_forces(const PhysicsObject &b, vector<PhysicsObject> &bs, const FlockCon
 
 
 /* calculates separation force
- * @s the distance to keep seperated from
+ * @s the scaling factor
  * @b the Boid to calculate the force on
  * @bs the boids in the flock
  * @sep a pointer to where the force vector will be written
  * */
 void seperate(float s, const PhysicsObject &b, const vector<PhysicsObject> &bs, V3 *sep) {
-    float d ; //distance between boid and other
+    float d2 ; //distance between boid and other
     int c = 0 ; //number of boids near
-    float ss = s * s ;
     V3 vd ; //distance vector
-    V3 p = b.pos ; //position of boid
-    for (int i = 0; i < bs.size(); ++i) {
-        sub(&p, &bs[i].pos, &vd) ; //calculate distance vector
-        d = mag2(&vd) ;
-        if (d < ss and d != 0) {
-            normalize(&vd) ;
-            scale(1.0f / d, &vd) ; //scale by inverse of distance squared
+    for (auto obj : bs) {
+        sub(&b.pos, &obj.pos, &vd) ; //calculate distance vector
+        d2 = mag2(&vd) ;
+        if (d2 != 0) {
+            float d = std::sqrt(d2);
+            scale(s / (d * d * d), &vd) ; //normalize and scale by inverse of distance squared
             add(&vd, sep, sep) ;
             ++c ;
         }
@@ -95,4 +96,16 @@ void gravity(float mass, V3* m, const PhysicsObject& b, V3* v) {
     float s = mag2(&dist) ;
     scale(1 / s * mass, &dist) ;
     add(&dist, v, v) ;
+}
+
+vector<PhysicsObject> get_flock(float d, const PhysicsObject &obj, const vector<PhysicsObject> &objs) {
+    vector<PhysicsObject> flock;
+    V3 dv;
+    float d2;
+    for (auto o : objs) {
+        sub(&obj.pos,&o.pos,&dv);
+        d2 = mag2(&dv);
+        if (d2 <= d*d) { flock.push_back(o); }
+    }
+    return flock;
 }

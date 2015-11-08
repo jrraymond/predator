@@ -9,6 +9,7 @@
 
 class FlockConfig {
 public:
+    float flock_distance;
     float seperate_factor;
     float align_factor;
     float cohesion_factor;
@@ -19,5 +20,7 @@ public:
 class GameConfig {
 public:
     FlockConfig flock;
+    float avoid_player_strength;
+    float avoid_player_distance;
 };
 #endif //FLOCK_HERD_SCHOOL_GAMECONFIG_H

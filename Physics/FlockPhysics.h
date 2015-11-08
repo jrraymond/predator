@@ -13,9 +13,10 @@ using std::vector;
 
 V3 boid_forces(const PhysicsObject &b, vector<PhysicsObject> &bs, const FlockConfig config);
 
-void seperate(float s, const PhysicsObject &b, const vector<PhysicsObject> &bs, V3 *sep) ;
+void seperate(float s, const PhysicsObject &b, const vector<PhysicsObject> &bs, V3 *sep);
 void cohesion(float x, const PhysicsObject &b, const vector<PhysicsObject> &bs, V3 *coh) ;
 void align(float x, const vector<PhysicsObject> &bs, V3 *ali) ;
 V3 centroid(const vector<PhysicsObject> &bs) ;
+vector<PhysicsObject> get_flock(float d, const PhysicsObject &obj, const vector<PhysicsObject> &objs);
 
 #endif //FLOCK_HERD_SCHOOL_FLOCKPHYSICS_H

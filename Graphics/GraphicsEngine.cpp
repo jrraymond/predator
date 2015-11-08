@@ -70,10 +70,7 @@ GraphicsEngine::GraphicsEngine(GameState state) {
     int ibox_s = 24 ; //12 lines, 2 vertices per line
     num_iboxes_pts = ibox_s * num_iboxes ;
     float ibox_vertices[num_iboxes_pts * ibox_pt_s] ;
-    InvertedBox bounding_box (0,0,0,20,20,20,1,1,1,1) ;
-    vector<InvertedBox> iboxes;
-    iboxes.push_back(bounding_box) ;
-    InvertedBox::render(iboxes, ibox_vertices) ;
+    InvertedBox::render(state.iboxes, ibox_vertices) ;
     glBufferData(GL_ARRAY_BUFFER, sizeof(ibox_vertices), ibox_vertices, GL_STATIC_DRAW) ;
     glEnableVertexAttribArray(pos_attr) ;
     glVertexAttribPointer(pos_attr, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0) ;

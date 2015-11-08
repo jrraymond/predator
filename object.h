@@ -12,7 +12,7 @@ struct Vtx {
 
 class Obj {
 public:
-    virtual V3 collides(V3 p, V3 v, float t) = 0 ;
+    virtual V3 collides(V3 p, V3 fpos) = 0 ;
     virtual void render() = 0 ;
 } ;
 
@@ -20,7 +20,7 @@ class InvertedBox : Obj {
 public:
     float x, y, z, pdx, pdy, pdz, ndx, ndy, ndz, r, g, b, a ;
 
-    V3 collides(V3 p, V3 v, float t) ;
+    V3 collides(V3 p, V3 fpos);
 
     void render() { };
     static void render(vector<InvertedBox>& iboxes, float* pts) ;

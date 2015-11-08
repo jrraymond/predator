@@ -92,15 +92,14 @@ void InvertedBox::render(vector<InvertedBox>& iboxes, float* pts) {
     }
 }
 //TODO do correct bounce
-V3 InvertedBox::collides(V3 p, V3 v, float t) {
-    V3 future_p ;
-    add(&p, &v, &future_p) ;
-    scale(t, &future_p) ;
-    if (future_p.x > x + pdx || future_p.x < x - pdx ||
-            future_p.y > y + pdy || future_p.y < y - pdy ||
-            future_p.z > z + pdz || future_p.z < z - pdz) {
-        scale(-1.0f, &future_p) ; // reverse direction
-        return future_p ;
+V3 InvertedBox::collides(V3 p, V3 fpos) {
+    V3 vel;
+    sub(&fpos, &p, &vel);
+    if (fpos.x > x + pdx || fpos.x < x - pdx ||
+            fpos.y > y + pdy || fpos.y < y - pdy ||
+            fpos.z > z + pdz || fpos.z < z - pdz) {
+        scale(-1.0f, &vel) ; // reverse direction
+        return vel ;
     }
     return V3 {0,0,0} ;
 }

@@ -1,16 +1,21 @@
 #ifndef VECTOR3_H
 #define VECTOR3_H
 #include <cmath>
+#include <glm/detail/type_vec.hpp>
+#include <glm/detail/type_vec3.hpp>
 #include <iostream>
 
 enum Axis  { X_AXIS, Y_AXIS, Z_AXIS } ;
 struct V3 {
-    float x ;
-    float y ;
-    float z ;
+    V3 () {}
+    V3 (float a, float b, float c) : x(a), y(b), z(c) {}
+    float x = 0;
+    float y = 0;
+    float z = 0;
 } ;
 std::ostream& operator<< (std::ostream& stream, const V3& v);
 
+V3 fromGLM(const glm::vec3);
 void sub(const V3* u, const V3* v, V3* w) ;
 void add(const V3* u, const V3* v, V3* w) ;
 void scale(float s, V3* v) ;

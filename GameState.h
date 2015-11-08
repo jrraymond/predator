@@ -10,6 +10,7 @@
 #include "Boid.h"
 #include "GameConfig.h"
 #include "Graphics/Camera.h"
+#include "object.h"
 
 using std::vector;
 
@@ -21,6 +22,7 @@ public:
     vector<Boid> boids;
     vector<PhysicsObject> boid_physics_objs;
     vector<PhysicsObject> static_objs;
+    vector<InvertedBox> iboxes;
     float* grid_2d;
 };
 

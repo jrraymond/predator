@@ -66,3 +66,7 @@ void cap(float s, V3 *v) {
 bool operator==(const V3 &u, const V3 &v) {
     return u.x == v.x && u.y == v.y && u.z == v.z;
 }
+
+V3 fromGLM(const glm::vec3 v) {
+    return V3 {v.x, v.y, v.z};
+}

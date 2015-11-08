@@ -7,6 +7,7 @@
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
+#include <iosfwd>
 
 class Player {
 public:
@@ -17,6 +18,6 @@ public:
     float v_angle ;
     float fov ;
 };
-
+std::ostream &operator<<(std::ostream &stream, const Player &p);
 
 #endif //FLOCK_HERD_SCHOOL_PLAYER_H
