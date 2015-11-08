@@ -2,6 +2,8 @@
 #define VECTOR3_H
 #include <cmath>
 #include <iostream>
+
+enum Axis  { X_AXIS, Y_AXIS, Z_AXIS } ;
 struct V3 {
     float x ;
     float y ;

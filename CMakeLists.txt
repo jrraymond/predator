@@ -25,19 +25,19 @@ include_directories(${FREETYPE_INCLUDE_DIRS})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-set(HEADERS vector3.h boids.h lib/shader_utils/shader_utils.h object.h lib/gl_text/text.h)
-set(SOURCE_FILES main.cpp boids.cpp vector3.cpp lib/shader_utils/shader_utils.cpp object.cpp lib/gl_text/text.cpp)
+set(HEADERS vector3.h Flock.h lib/shader_utils/shader_utils.h object.h lib/gl_text/text.h)
+set(SOURCE_FILES main.cpp Flock.cpp vector3.cpp lib/shader_utils/shader_utils.cpp object.cpp lib/gl_text/text.cpp GameState.cpp GameState.h Player.cpp Player.h Physics/PhysicsObject.cpp Physics/PhysicsObject.h Boid.cpp Boid.h Physics/PhysicsEngine.cpp Physics/PhysicsEngine.h Physics/FlockPhysics.cpp Physics/FlockPhysics.h GameConfig.cpp GameConfig.h Graphics/GraphicsEngine.cpp Graphics/GraphicsEngine.h Graphics/Camera.cpp Graphics/Camera.h)
 add_executable(flock_herd_school ${SOURCE_FILES})
 
 #target_link_libraries(flock_herd_school ${GLFW_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})
 target_link_libraries(flock_herd_school  ${GLFW_LIBRARIES} X11 Xxf86vm Xrandr pthread Xi ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES} ${FREETYPE_LIBRARIES})
 
 set(shaders "vertex_shader.glsl"
-            "fragment_shader.glsl"
-            "text_vertex_shader.glsl"
-            "text_fragment_shader.glsl"
-            "OpenSans-Regular.ttf"
-            "FreeSans.ttf")
+        "fragment_shader.glsl"
+        "text_vertex_shader.glsl"
+        "text_fragment_shader.glsl"
+        "assets/fonts/OpenSans-Regular.ttf"
+        "assets/fonts/FreeSans.ttf")
 if (NOT CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR)
     foreach(item IN LISTS shaders)
         configure_file(
