@@ -12,8 +12,9 @@ public:
     float seperate_factor;
     float align_factor;
     float cohesion_factor;
-    float max_acc;
+    float max_pos;
     float max_vel;
+    float max_acc;
 };
 class GameConfig {
 public:

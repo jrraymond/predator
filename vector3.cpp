@@ -31,12 +31,38 @@ float mag(const V3* v) {
 float dot(const V3* u, const V3* v) {
     return u->x * v->x + u->y * v->y + u->z * v->z ;
 }
+
+bool is_zero_length(const V3 *u) {
+    return mag2(u) == 0;
+}
+
 void normalize(V3* u) {
-    const float s = mag(u) ;
+    const float m2 = mag2(u);
+    if (m2 == 0) {
+        u->x = 0;
+        u->y = 0;
+        u->z = 0;
+        return;
+    }
+    const float s = std::sqrt(m2) ;
     u->x = u->x / s ;
     u->y = u->y / s ;
     u->z = u->z / s ;
 }
 void debug_v3(V3* v, std::string s) {
     std::cout << s << "| V3: " << v->x << "," << v->y << "," << v->z << std::endl ;
+}
+
+std::ostream &operator<<(std::ostream &stream, const V3 &v) {
+    stream << "{" << v.x << "," << v.y << "," << v.z << "}";
+    return stream;
+}
+
+void cap(float s, V3 *v) {
+    float m = mag2(v);
+    if (m > s*s) scale(s / std::sqrt(m),v) ;
+}
+
+bool operator==(const V3 &u, const V3 &v) {
+    return u.x == v.x && u.y == v.y && u.z == v.z;
 }

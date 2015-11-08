@@ -56,6 +56,6 @@ public:
 float* gen_2d_grid(int* size, int* num_pts, int dim, int step, Axis fixed_axis, float fixed_at) ;
 float* gen_3d_grid(int* size, int* num_pts, int dim, int step) ;
 float* gen_boid_normals(Vtx* vertices, int num_vertices, int* num_pts) ;
-void debug_vtx(Vtx v);
+void debug_vtx(const Vtx &v);
 void debug_vertices(Vtx* vs, int size);
 #endif

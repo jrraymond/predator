@@ -10,7 +10,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
 
-void render_old(vector<PhysicsObject> &boids, Vtx *vertices, int boid_s, double delta) ;
+void render_old(const vector<PhysicsObject> &boids, Vtx *vertices);
 
 bool GraphicsEngine::initialized = false;
 
@@ -41,7 +41,7 @@ GraphicsEngine::GraphicsEngine(GameState state) {
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
     num_boid_vertices = 12 * state.boid_physics_objs.size();
     vertices = (Vtx*) malloc(num_boid_vertices * sizeof(Vtx)) ;
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
+    glBufferData(GL_ARRAY_BUFFER, num_boid_vertices * sizeof(Vtx), vertices, GL_DYNAMIC_DRAW) ;
 
     glEnableVertexAttribArray(pos_attr) ;
     glEnableVertexAttribArray(col_attr) ;
@@ -85,7 +85,6 @@ GraphicsEngine::GraphicsEngine(GameState state) {
     glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(state.camera.view));
     glUniformMatrix4fv(uni_proj, 1, GL_FALSE, glm::value_ptr(state.camera.proj));
     uni_amb = glGetUniformLocation(shader_program, "ambient") ;
-    glm::vec3 white_light (1.0f,1.0f,1.0f) ;
     glm::vec3 ambient_light (0.1f, 0.1f, 0.1f) ;
     glUniform3fv(uni_amb, 1, &ambient_light[0]) ;
     GLint uni_light = glGetUniformLocation(shader_program, "light_model") ;
@@ -109,13 +108,11 @@ void GraphicsEngine::render(GameState state, float t) {
     glUniformMatrix4fv(uni_view, 1, GL_FALSE, glm::value_ptr(state.camera.view)) ;
     glUniformMatrix4fv(uni_model, 1, GL_FALSE, glm::value_ptr(state.camera.model));
 
-/*
     glBindVertexArray(vao_boids) ;
-    render_old(state.boid_physics_objs, vertices, num_boid_vertices, t) ; //TODO render with current velocity
+    render_old(state.boid_physics_objs, vertices); //TODO render with current velocity
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW) ;
+    glBufferData(GL_ARRAY_BUFFER, num_boid_vertices * sizeof(Vtx), vertices, GL_DYNAMIC_DRAW) ;
     glDrawArrays(GL_TRIANGLES, 0, num_boid_vertices) ;
-*/
 
     glBindVertexArray(vao_grid) ;
     glVertexAttrib3f(col_attr, 1.0f, 0.0f, 0.0f) ;
@@ -144,20 +141,23 @@ GraphicsEngine::~GraphicsEngine() {
 // TODO instancing
 // TODO take into account time between frames (delta)
 
-void render_old(vector<PhysicsObject> &boids, Vtx *vertices, int num_vs, double delta) {
-    /*
+void render_old(const vector<PhysicsObject> &boids, Vtx *vertices) {
     int s = (int) boids.size() ;
     Vtx vtx_0, vtx_1, vtx_2, vtx_3 ; //4 vertices per triangle
     PhysicsObject b ;
-    V3 pos ;
+    V3 pos, acc ;
     V3 t_0, t_1, t_2, v_0, v_1, v_2, v_3 ;
     V3 e_0, e_1,n ;
     int v_i = 0 ;
     for (int b_i=0; b_i < s; ++b_i) {
         b = boids[b_i] ;
         pos = b.pos ;
+        acc = b.acc ;
+        if (is_zero_length(&acc)) { acc.x = 0.000001; } //acc,t_0 can't be zero or equal
         t_0 = b.vel ;
-        cross(&t_0, &b.acc, &t_1) ;
+        if (is_zero_length(&t_0)) { t_0.y = 0.000001; }
+        if (t_0 == acc) { acc.x += 0.000001; }
+        cross(&t_0, &acc, &t_1) ;
         cross(&t_1, &t_0, &t_2) ;
         normalize(&t_0) ;
         scale(2.0f, &t_0) ;
@@ -212,10 +212,9 @@ void render_old(vector<PhysicsObject> &boids, Vtx *vertices, int num_vs, double 
         vertices[v_i++] = vtx_3 ;
         vtx_2.normal = n ; //vertex 2
         vertices[v_i++] = vtx_2 ;
-        //debug_vtx(&vtx_0) ;
-        //debug_vtx(&vtx_1) ;
-        //debug_vtx(&vtx_2) ;
-        //debug_vtx(&vtx_3) ;
+        //debug_vtx(vtx_0) ;
+        //debug_vtx(vtx_1) ;
+        //debug_vtx(vtx_2) ;
+        //debug_vtx(vtx_3) ;
     } ;
-     */
 }

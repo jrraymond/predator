@@ -141,7 +141,7 @@ float* gen_3d_grid(int* size, int* num_pts, int dim, int step) { //TODO gen only
     }
     return pts ;
 }
-void debug_vtx(Vtx v) {
+void debug_vtx(const Vtx &v) {
     std::cout << "|p(" << v.position.x << "," << v.position.y << "," << v.position.z << ")" ;
     std::cout << "|c(" << v.color.x << "," << v.color.y << "," << v.color.z << ")" ;
     std::cout << "|n(" << v.normal.x << "," << v.normal.y << "," << v.normal.z << ")" ;

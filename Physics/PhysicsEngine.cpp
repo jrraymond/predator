@@ -12,7 +12,7 @@ GameState update_physics(GameState state, float t) {
     /* Calculate forces on all boids */
     vector<PhysicsObject> bp_objs;
     bp_objs.reserve(state.boid_physics_objs.size()) ;
-
+    state.boid_physics_objs[0].debug("boid: ");
     for (int i=0; i<state.boid_physics_objs.size();++i) {
         PhysicsObject pobj (state.boid_physics_objs[i]);
         V3 boid_force = boid_forces(pobj, state.boid_physics_objs, state.config.flock);
@@ -24,11 +24,11 @@ GameState update_physics(GameState state, float t) {
     /* Move all the boids */
     //TODO calculate collisions
     for (int i=0; i<state.boid_physics_objs.size();++i) {
-        bp_objs[i].move(t);
+        bp_objs[i].move(t, state.config.flock);
     }
 
+    //bp_objs[0].debug("boid 0: ");
     GameState next_state (state);
     next_state.boid_physics_objs = bp_objs;
-
     return next_state;
 }

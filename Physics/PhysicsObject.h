@@ -6,6 +6,9 @@
 #define FLOCK_HERD_SCHOOL_PHYSICSOBJECT_H
 
 #include "../vector3.h"
+#include "../GameConfig.h"
+
+using std::string;
 
 class PhysicsObject {
 public:
@@ -15,7 +18,8 @@ public:
     V3 acc ;        // m/s^2
     V3 force ;      // force acting on object
     float radius ;  // everything is a sphere for now
-    void move(float t);
+    void move(float t, FlockConfig config);
+    void debug(string msg) ;
 };
 
 

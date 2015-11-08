@@ -24,7 +24,7 @@
 //TODO finish 3d grid using instancing
 using std::vector ;
 
-const FlockConfig default_flock_config { 5, 1, 1, 0.0001, 0.05 };
+const FlockConfig default_flock_config { 5, 1, 1, 20, 0.05, 0.0001 };
 const GameConfig default_game_config { default_flock_config };
 
 void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
@@ -99,12 +99,10 @@ int main() {
         elapsed_time = this_time - last_time;
         lag_time += elapsed_time ;
         last_time = this_time ;
-       // std::cout << this_time << "\t" << last_time << "\t" << elapsed_time << "\t" << lag_time << "\n----------------\n" ;
 
         handle_input(window, &game_state.player, 0.1f, &game_state.camera.view) ;
 
         while (lag_time >= ms_per_update) {
-            //std::cout << "updating . . .\n" ;
             ++physics_updates ;
             game_state = update_physics(game_state, ms_per_update) ;
             lag_time -= ms_per_update ;
@@ -165,7 +163,8 @@ vector<PhysicsObject> spawn_boids(int max_x, int max_y, int max_z, int sz, int s
     std::uniform_int_distribution<int>  r_z(-max_z, max_z) ;
     int x, y, z ;
     V3 p, v;
-    V3 a, f {0,0,0};
+    V3 a {0,0,0};
+    V3 f {0,0,0};
     float mass;
     float radius;
     for (int i = 0 ; i < number ; ++i) {
@@ -174,11 +173,11 @@ vector<PhysicsObject> spawn_boids(int max_x, int max_y, int max_z, int sz, int s
         v = V3{(float) rand() / RAND_MAX * 2 - 1,
                (float) rand() / RAND_MAX * 2 - 1,
                (float) rand() / RAND_MAX * 2 - 1} ;
-        normalize(&v); normalize(&a) ;
         mass = sz + sz_range * ((float) rand() / RAND_MAX * 2 - 1);
         radius = mass;
         PhysicsObject obj {mass, p, v, a, f, radius};
         objs.push_back(obj) ;
+        obj.debug("spawned: ");
     }
     return objs ;
 }
