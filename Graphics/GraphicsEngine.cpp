@@ -10,11 +10,11 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
 
-void render_old(const vector<PhysicsObject> &boids, Vtx *vertices);
 
 bool GraphicsEngine::initialized = false;
 
 GraphicsEngine::GraphicsEngine(GameState state) {
+    int player_vertices = 12;
     GraphicsEngine::initialized = true;
     const char* vtx_f_name = "vertex_shader.glsl";
     const char* frag_f_name = "fragment_shader.glsl";
@@ -39,7 +39,7 @@ GraphicsEngine::GraphicsEngine(GameState state) {
     glBindVertexArray(vao_boids) ;
     glGenBuffers(1, &vbo_boids) ; //creates buffer object
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
-    num_boid_vertices = 12 * state.boid_physics_objs.size();
+    num_boid_vertices = 12 * state.boid_physics_objs.size() + player_vertices;
     vertices = (Vtx*) malloc(num_boid_vertices * sizeof(Vtx)) ;
     glBufferData(GL_ARRAY_BUFFER, num_boid_vertices * sizeof(Vtx), vertices, GL_DYNAMIC_DRAW) ;
 
@@ -107,6 +107,7 @@ void GraphicsEngine::render(GameState state, float t) {
 
     glBindVertexArray(vao_boids) ;
     render_old(state.boid_physics_objs, vertices); //TODO render with current velocity
+    render_player(state.player, vertices + num_boid_vertices - 12); //player is last 12 vertices in array
     glBindBuffer(GL_ARRAY_BUFFER, vbo_boids) ;
     glBufferData(GL_ARRAY_BUFFER, num_boid_vertices * sizeof(Vtx), vertices, GL_DYNAMIC_DRAW) ;
     glDrawArrays(GL_TRIANGLES, 0, num_boid_vertices) ;
@@ -139,79 +140,158 @@ GraphicsEngine::~GraphicsEngine() {
 // TODO take into account time between frames (delta)
 
 void render_old(const vector<PhysicsObject> &boids, Vtx *vertices) {
-    int s = (int) boids.size() ;
-    Vtx vtx_0, vtx_1, vtx_2, vtx_3 ; //4 vertices per triangle
-    PhysicsObject b ;
-    V3 pos, acc ;
-    V3 t_0, t_1, t_2, v_0, v_1, v_2, v_3 ;
-    V3 e_0, e_1,n ;
-    int v_i = 0 ;
-    for (int b_i=0; b_i < s; ++b_i) {
-        b = boids[b_i] ;
-        pos = b.pos ;
-        acc = b.acc ;
+    int s = (int) boids.size();
+    Vtx vtx_0, vtx_1, vtx_2, vtx_3; //4 vertices per triangle
+    PhysicsObject b;
+    V3 pos, acc;
+    V3 t_0, t_1, t_2, v_0, v_1, v_2, v_3;
+    V3 e_0, e_1, n;
+    int v_i = 0;
+    for (int b_i = 0; b_i < s; ++b_i) {
+        b = boids[b_i];
+        pos = b.pos;
+        acc = b.acc;
         if (is_zero_length(&acc)) { acc.x = 0.000001; } //acc,t_0 can't be zero or equal
-        t_0 = b.vel ;
+        t_0 = b.vel;
         if (is_zero_length(&t_0)) { t_0.y = 0.000001; }
         if (t_0 == acc) { acc.x += 0.000001; }
-        cross(&t_0, &acc, &t_1) ;
-        cross(&t_1, &t_0, &t_2) ;
-        normalize(&t_0) ;
-        scale(2.0f, &t_0) ;
-        add(&pos, &t_0, &v_0) ; //calculate bow vertex
-        scale(-0.5f, &t_0) ; //calculate stern 3 vertices
-        add(&pos, &t_0, &t_0) ;
-        normalize(&t_2) ;
-        add(&t_0, &t_2, &v_1) ; //up stern vertex
-        normalize(&t_1) ;
-        add(&t_0, &t_1, &v_2) ; //down stern vertex 1
-        scale(-1.0f, &t_1) ;
-        add(&t_0, &t_1, &v_3) ; //down stern vertex 2
-        vtx_0.position = v_0 ;
-        vtx_0.color = V3 {0.0f, 1.0f, 0.0f} ;
-        sub(&v_1, &v_0, &e_0) ; //will reuse e_0 b/c shared by triangle 0,3,1
-        sub(&v_2, &v_0, &e_1) ;
-        cross(&e_0, &e_1, &n) ;
-        vtx_0.normal = n ;
-        vertices[v_i++] = vtx_0 ; //triangle 0,1,2
-        vtx_1.position = v_1 ;
-        vtx_1.color = V3 { 0.0f, 1.0f, 0.0f } ;
-        vtx_1.normal = n ;
-        vertices[v_i++] = vtx_1 ;
-        vtx_2.position = v_2 ;
-        vtx_2.color = V3 { 0.0f, 0.0f, 1.0f } ;
-        vtx_2.normal = n ;
-        vertices[v_i++] = vtx_2 ;
-        sub(&v_3, &v_0, &e_1) ;//triangle 0,1,3
-        cross(&e_1, &e_0, &n) ; //will reuse e_1 for triangle 0,2,3
-        vtx_0.normal = n ; //vertex 0
-        vertices[v_i++] = vtx_0 ;
-        vtx_3.position = v_3 ;
-        vtx_3.color = V3 {0.0f, 0.0f, 1.0f } ;
-        vtx_3.normal = n ; //vertex 3
-        vertices[v_i++] = vtx_3 ;
-        vtx_1.normal = n ; //vertex 1
-        vertices[v_i++] = vtx_1 ;
-        sub(&v_2, &v_0, &e_0) ; //triangle 0,2,3
-        cross(&e_0, &e_1, &n) ;
-        vtx_0.normal = n ; //vertex 0
-        vertices[v_i++] = vtx_0 ;
-        vtx_2.normal = n ; //vertex 2
-        vertices[v_i++] = vtx_2 ;
-        vtx_3.normal = n ; //vertex 3
-        vertices[v_i++] = vtx_3 ;
-        sub(&v_3, &v_1, &e_0) ; //triangle 1,3,2
-        sub(&v_2, &v_1, &e_1) ;
-        cross(&e_0, &e_1, &n) ;
-        vtx_1.normal = n ; //vertex 1
-        vertices[v_i++] = vtx_1 ;
-        vtx_3.normal = n ; //vertex 3
-        vertices[v_i++] = vtx_3 ;
-        vtx_2.normal = n ; //vertex 2
-        vertices[v_i++] = vtx_2 ;
+        cross(&t_0, &acc, &t_1);
+        cross(&t_1, &t_0, &t_2);
+        normalize(&t_0);
+        scale(2.0f, &t_0);
+        add(&pos, &t_0, &v_0); //calculate bow vertex
+        scale(-0.5f, &t_0); //calculate stern 3 vertices
+        add(&pos, &t_0, &t_0);
+        normalize(&t_2);
+        add(&t_0, &t_2, &v_1); //up stern vertex
+        normalize(&t_1);
+        add(&t_0, &t_1, &v_2); //down stern vertex 1
+        scale(-1.0f, &t_1);
+        add(&t_0, &t_1, &v_3); //down stern vertex 2
+        vtx_0.position = v_0;
+        vtx_0.color = V3 {0.0f, 1.0f, 0.0f};
+        sub(&v_1, &v_0, &e_0); //will reuse e_0 b/c shared by triangle 0,3,1
+        sub(&v_2, &v_0, &e_1);
+        cross(&e_0, &e_1, &n);
+        vtx_0.normal = n;
+        vertices[v_i++] = vtx_0; //triangle 0,1,2
+        vtx_1.position = v_1;
+        vtx_1.color = V3 {0.0f, 1.0f, 0.0f};
+        vtx_1.normal = n;
+        vertices[v_i++] = vtx_1;
+        vtx_2.position = v_2;
+        vtx_2.color = V3 {0.0f, 0.0f, 1.0f};
+        vtx_2.normal = n;
+        vertices[v_i++] = vtx_2;
+        sub(&v_3, &v_0, &e_1);//triangle 0,1,3
+        cross(&e_1, &e_0, &n); //will reuse e_1 for triangle 0,2,3
+        vtx_0.normal = n; //vertex 0
+        vertices[v_i++] = vtx_0;
+        vtx_3.position = v_3;
+        vtx_3.color = V3 {0.0f, 0.0f, 1.0f};
+        vtx_3.normal = n; //vertex 3
+        vertices[v_i++] = vtx_3;
+        vtx_1.normal = n; //vertex 1
+        vertices[v_i++] = vtx_1;
+        sub(&v_2, &v_0, &e_0); //triangle 0,2,3
+        cross(&e_0, &e_1, &n);
+        vtx_0.normal = n; //vertex 0
+        vertices[v_i++] = vtx_0;
+        vtx_2.normal = n; //vertex 2
+        vertices[v_i++] = vtx_2;
+        vtx_3.normal = n; //vertex 3
+        vertices[v_i++] = vtx_3;
+        sub(&v_3, &v_1, &e_0); //triangle 1,3,2
+        sub(&v_2, &v_1, &e_1);
+        cross(&e_0, &e_1, &n);
+        vtx_1.normal = n; //vertex 1
+        vertices[v_i++] = vtx_1;
+        vtx_3.normal = n; //vertex 3
+        vertices[v_i++] = vtx_3;
+        vtx_2.normal = n; //vertex 2
+        vertices[v_i++] = vtx_2;
         //debug_vtx(vtx_0) ;
         //debug_vtx(vtx_1) ;
         //debug_vtx(vtx_2) ;
         //debug_vtx(vtx_3) ;
-    } ;
+    };
+}
+
+void render_player(const Player p, Vtx* vertices) {
+    //copy player vertices
+    V3 pos, acc, t_0, t_1, t_2, v_0, v_1, v_2, v_3, e_0, e_1, n;
+    Vtx vtx_0, vtx_1, vtx_2, vtx_3;
+    int v_i = 0;
+    pos = fromGLM(p.pos) ;
+    acc = fromGLM(p.acc) ;
+    if (is_zero_length(&acc)) { acc.x = 0.000001; } //acc,t_0 can't be zero or equal
+    t_0 = fromGLM(p.vel) ;
+    if (is_zero_length(&t_0)) { t_0.y = 0.000001; }
+    if (t_0 == acc) { acc.x += 0.000001; }
+    cross(&t_0, &acc, &t_1) ;
+    cross(&t_1, &t_0, &t_2) ;
+    normalize(&t_0) ;
+    scale(2.0f, &t_0) ;
+    add(&pos, &t_0, &v_0) ; //calculate bow vertex
+    scale(-0.5f, &t_0) ; //calculate stern 3 vertices
+    add(&pos, &t_0, &t_0) ;
+    normalize(&t_2) ;
+    add(&t_0, &t_2, &v_1) ; //up stern vertex
+    normalize(&t_1) ;
+    add(&t_0, &t_1, &v_2) ; //down stern vertex 1
+    scale(-1.0f, &t_1) ;
+    add(&t_0, &t_1, &v_3) ; //down stern vertex 2
+    vtx_0.position = v_0 ;
+    vtx_0.color = V3 {0.0f, 0.5f, 0.0f} ;
+    sub(&v_1, &v_0, &e_0) ; //will reuse e_0 b/c shared by triangle 0,3,1
+    sub(&v_2, &v_0, &e_1) ;
+    cross(&e_0, &e_1, &n) ;
+    vtx_0.normal = n ;
+    vertices[v_i++] = vtx_0 ; //triangle 0,1,2
+
+    vtx_1.position = v_1 ;
+    vtx_1.color = V3 { 0.0f, 0.0f, 0.3f } ;
+    vtx_1.normal = n ;
+    vertices[v_i++] = vtx_1 ;
+
+    vtx_2.position = v_2 ;
+    vtx_2.color = V3 { 0.2f, 0.0f, 0.0f } ;
+    vtx_2.normal = n ;
+    vertices[v_i++] = vtx_2 ;
+
+    sub(&v_3, &v_0, &e_1) ;//triangle 0,1,3
+    cross(&e_1, &e_0, &n) ; //will reuse e_1 for triangle 0,2,3
+    vtx_0.normal = n ; //vertex 0
+    vertices[v_i++] = vtx_0 ;
+
+    vtx_3.position = v_3 ;
+    vtx_3.color = V3 {0.2f, 0.0f, 0.0f } ;
+    vtx_3.normal = n ; //vertex 3
+    vertices[v_i++] = vtx_3 ;
+
+    vtx_1.normal = n ; //vertex 1
+    vertices[v_i++] = vtx_1 ;
+
+    sub(&v_2, &v_0, &e_0) ; //triangle 0,2,3
+    cross(&e_0, &e_1, &n) ;
+    vtx_0.normal = n ; //vertex 0
+    vertices[v_i++] = vtx_0 ;
+
+    vtx_2.normal = n ; //vertex 2
+    vertices[v_i++] = vtx_2 ;
+
+    vtx_3.normal = n ; //vertex 3
+    vertices[v_i++] = vtx_3 ;
+
+    sub(&v_3, &v_1, &e_0) ; //triangle 1,3,2
+    sub(&v_2, &v_1, &e_1) ;
+    cross(&e_0, &e_1, &n) ;
+    vtx_1.normal = n ; //vertex 1
+    vertices[v_i++] = vtx_1 ;
+
+    vtx_3.normal = n ; //vertex 3
+    vertices[v_i++] = vtx_3 ;
+
+    vtx_2.normal = n ; //vertex 2
+    vertices[v_i] = vtx_2 ;
 }

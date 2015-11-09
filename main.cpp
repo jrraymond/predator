@@ -25,9 +25,9 @@
 using std::vector ;
 
 const FlockConfig default_flock_config { 5, 5, 0.5, 1, 100, 0.1, 0.1};
-const GameConfig default_game_config { default_flock_config, 5, 10 };
+const GameConfig default_game_config { default_flock_config, 5, 10, 10, 10 };
 
-void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) ;
+void handle_input(GLFWwindow *window, Player *p, glm::mat4 *view_ptr, const GameConfig config);
 double inline sec_to_ms(double seconds);
 
 vector<PhysicsObject> spawn_boids(int max_x, int max_y, int max_z, int sz, int sz_range, int number);
@@ -61,7 +61,7 @@ int main() {
     int physics_updates = 0 ;
     // Boid information
     int num_boids, boid_s, vert_s;
-    num_boids = 500 ; //for now
+    num_boids = 50 ;
     // init game state
     GameState game_state ;
     game_state.config = default_game_config;
@@ -100,7 +100,7 @@ int main() {
         lag_time += elapsed_time ;
         last_time = this_time ;
 
-        handle_input(window, &game_state.player, 0.1f, &game_state.camera.view) ;
+        handle_input(window, &game_state.player, &game_state.camera.view, game_state.config);
 
         while (lag_time >= ms_per_update) {
             ++physics_updates ;
@@ -124,8 +124,8 @@ int main() {
     return EXIT_SUCCESS ;
 }
 
-void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) {
-    float speed = 10 ;
+void handle_input(GLFWwindow *window, Player *p, glm::mat4 *view_ptr, const GameConfig config) {
+    float speed = 100 ;
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) { p->h_angle -= 0.1f ; }
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) { p->h_angle += 0.1f ; }
     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) { p->v_angle -= 0.1f ; }
@@ -137,14 +137,18 @@ void handle_input(GLFWwindow* window, Player* p, float dt, glm::mat4* view_ptr) 
                                , 0
                                , cos(p->h_angle - 3.14f/2.0f)) ;
     glm::vec3 up = glm::cross(right, dir) ;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) { p->pos += right * dt * speed ; }
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) { p->pos -= right * dt * speed ;  }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) { p->pos -= dir * dt * speed ; }
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) { p->pos += dir * dt * speed ; }
-    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) { p->pos += up * dt * speed ; }
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) { p->pos -= up * dt * speed ; }
-    *view_ptr = glm::lookAt(p->pos, p->pos + dir, up) ;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) { p->acc += right; }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) { p->acc -= right;  }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) { p->acc -= dir; }
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) { p->acc += dir; }
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) { p->acc += up; }
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) { p->acc -= up; }
+    if (glm::length(p->acc) > 0) { p->acc = glm::normalize(p->acc);}
+    p->acc *= speed;
+    std::cout << "3" << fromGLM(p->acc) << std::endl;
+    *view_ptr = glm::lookAt(p->pos + dir * -config.camera_distance, p->pos, up) ;
     //std::cout << p->pos.z << "," << p->pos.y << "," << p->pos.z << "\n" ;
+    //p->vel = dir;
 }
 
 

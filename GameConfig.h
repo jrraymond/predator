@@ -22,5 +22,7 @@ public:
     FlockConfig flock;
     float avoid_player_strength;
     float avoid_player_distance;
+    float camera_distance;
+    float max_speed;
 };
 #endif //FLOCK_HERD_SCHOOL_GAMECONFIG_H
